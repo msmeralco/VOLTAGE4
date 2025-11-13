@@ -84,7 +84,7 @@ declare global {
   var __CITY_CSV_CACHE__: Map<string, CSVTransformer[]> | undefined;
 }
 
-const REFRESH_INTERVAL_SECONDS = 30;
+const REFRESH_INTERVAL_SECONDS = 15;
 const MAX_HISTORY_MS = 24 * 60 * 60 * 1000; // 24h
 const CITY_FILE_MAP: Record<string, string> = {
   "Quezon City": "mock_meralco_transformers_QC.csv",

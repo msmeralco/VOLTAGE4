@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Circle, Polyline } from
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
+import { Home } from "lucide-react";
 
 import type { TransformerRealtimeMetrics } from "@/types/dashboard";
 
@@ -29,11 +30,11 @@ interface CSVMapViewProps {
   onTransformerSelect?: (transformerId: string) => void;
 }
 
-function MapController({ center }: { center: [number, number] }) {
+function MapController({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap();
   useEffect(() => {
-    map.setView(center, 14);
-  }, [map, center]);
+    map.setView(center, zoom);
+  }, [map, center, zoom]);
   return null;
 }
 
@@ -90,14 +91,27 @@ export function CSVMapViewComponent({
       ]
     : [14.676, 121.0437];
 
+  const handleRecenter = () => {
+    if (mapRef.current) {
+      mapRef.current.setView(center, 16);
+    }
+  };
+
   return (
-    <div className="w-full h-[600px] rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-      <MapContainer center={center} zoom={14} style={{ height: "100%", width: "100%" }} ref={mapRef}>
+    <div className="w-full h-[600px] rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden relative">
+      <button
+        onClick={handleRecenter}
+        className="absolute top-4 right-4 z-[999] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shadow-md"
+        title="Recenter map"
+      >
+        <Home className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+      </button>
+      <MapContainer center={center} zoom={16} style={{ height: "100%", width: "100%" }} ref={mapRef}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <MapController center={center} />
+        <MapController center={center} zoom={16} />
 
         {transformers.map((metric) => {
           const transformer = metric.transformer;

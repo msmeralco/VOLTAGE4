@@ -33,7 +33,7 @@ import {
 } from "recharts";
 import type { DashboardDataResponse, TransformerRealtimeMetrics } from "@/types/dashboard";
 
-const allCities = [...cities, "Quezon City"];
+const allCities = [...cities];
 
 const getLoadStatus = (loadPercentage: number) => {
   if (loadPercentage >= 95) {
@@ -68,7 +68,7 @@ export default function MeralcoDashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardDataResponse | null>(null);
   const [selectedTransformerId, setSelectedTransformerId] = useState<string | null>(null);
   const [isLoadingRealtime, setIsLoadingRealtime] = useState<boolean>(true);
-  const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState<number>(30);
+  const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState<number>(15);
 
   const isCSVMode = selectedCity === "Quezon City";
 
@@ -106,7 +106,7 @@ export default function MeralcoDashboard() {
       const result = await response.json();
       if (result.success) {
         setDashboardData(result.data);
-        setRefreshIntervalSeconds(result.data.refreshIntervalSeconds ?? 30);
+        setRefreshIntervalSeconds(result.data.refreshIntervalSeconds ?? 15);
       }
     } catch (error) {
       console.error("Error fetching realtime data:", error);

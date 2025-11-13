@@ -15,7 +15,7 @@ export default function BarangayDashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardDataResponse | null>(null);
   const [selectedTransformerId, setSelectedTransformerId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState<number>(30);
+  const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState<number>(15);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
@@ -26,9 +26,15 @@ export default function BarangayDashboard() {
         const result = await response.json();
         if (result.success) {
           setDashboardData(result.data);
-          setRefreshIntervalSeconds(result.data.refreshIntervalSeconds ?? 30);
+          setRefreshIntervalSeconds(result.data.refreshIntervalSeconds ?? 15);
           if (!selectedTransformerId && result.data.transformers.length) {
-            setSelectedTransformerId(result.data.transformers[0].transformer.ID);
+            // Select the first PolePadTransformer instead of SubTransmission
+            const polePadTransformer = result.data.transformers.find(
+              (t: TransformerRealtimeMetrics) => t.transformer.EntityType === "PolePadTransformer"
+            );
+            setSelectedTransformerId(
+              polePadTransformer?.transformer.ID || result.data.transformers[0].transformer.ID
+            );
           }
         }
       } catch (error) {
