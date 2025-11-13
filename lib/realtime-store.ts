@@ -66,6 +66,7 @@ interface TransformerState {
   forecaster: EWMAForecaster;
   capacityKw: number;
   lastUpdated: number;
+  artificialOutage?: { startTime: number; duration?: number };
 }
 
 interface CityState {
@@ -329,12 +330,18 @@ function updateTransformerState(
   const households = transformerState.householdIds.map((id) => cityState.households.get(id)!);
 
   let transformerLoadKw = 0;
+  
+  // Check if transformer is in artificial outage
+  const isInOutage = isTransformerInArtificialOutage(transformerState);
+
   households.forEach((household) => {
     const reading = getSmartMeterReading(household.id, timestamp, REFRESH_INTERVAL_SECONDS);
-    household.latestLoadKw = reading.loadKw;
-    household.loadHistory.push({ timestamp: reading.timestamp.getTime(), loadKw: reading.loadKw });
+    // Set load to 0 if in artificial outage
+    const householdLoad = isInOutage ? 0 : reading.loadKw;
+    household.latestLoadKw = householdLoad;
+    household.loadHistory.push({ timestamp: reading.timestamp.getTime(), loadKw: householdLoad });
     household.loadHistory = pruneHistory(household.loadHistory);
-    transformerLoadKw += reading.loadKw;
+    transformerLoadKw += householdLoad;
   });
 
   const timestampMs = timestamp.getTime();
@@ -348,29 +355,39 @@ function updateTransformerState(
 
   const anomalies: Anomaly[] = [];
   const { detectors } = transformerState;
+  let mismatchRatio = 0;
 
-  const spikeAnomaly = detectors.spike.detect(transformerLoadKw, transformerState.rollingStats, transformerState.transformer.ID);
-  if (spikeAnomaly) {
-    transformerState.spikeEvents.push(timestampMs);
-    anomalies.push(spikeAnomaly);
+  // Only detect anomalies for Pole/Pad Transformers
+  if (transformerState.transformer.EntityType === "PolePadTransformer") {
+    const spikeAnomaly = detectors.spike.detect(transformerLoadKw, transformerState.rollingStats, transformerState.transformer.ID);
+    if (spikeAnomaly) {
+      transformerState.spikeEvents.push(timestampMs);
+      anomalies.push(spikeAnomaly);
+    }
+
+    const overdrawAnomaly = detectors.overdraw.detect(
+      rollingMean10Min,
+      baselineHourlyMean,
+      transformerState.transformer.ID
+    );
+    if (overdrawAnomaly) anomalies.push(overdrawAnomaly);
+
+    const outageAnomaly = detectors.outage.detect(transformerLoadKw, transformerState.transformer.ID);
+    if (outageAnomaly) anomalies.push(outageAnomaly);
+
+    const feederPowerKw = transformerLoadKw * (1 + (Math.random() - 0.5) * 0.1);
+    const mismatchAnomaly = detectors.mismatch.detect(feederPowerKw, transformerLoadKw, transformerState.transformer.ID);
+    mismatchRatio = Math.abs(feederPowerKw - transformerLoadKw) / Math.max(0.5, feederPowerKw);
+    transformerState.mismatchRatios.push({ timestamp: timestampMs, ratio: mismatchRatio });
+    transformerState.mismatchRatios = pruneHistory(transformerState.mismatchRatios);
+    if (mismatchAnomaly) anomalies.push(mismatchAnomaly);
+  } else {
+    // For Substation Transformers, only track mismatch ratio without anomaly detection
+    const feederPowerKw = transformerLoadKw * (1 + (Math.random() - 0.5) * 0.1);
+    mismatchRatio = Math.abs(feederPowerKw - transformerLoadKw) / Math.max(0.5, feederPowerKw);
+    transformerState.mismatchRatios.push({ timestamp: timestampMs, ratio: mismatchRatio });
+    transformerState.mismatchRatios = pruneHistory(transformerState.mismatchRatios);
   }
-
-  const overdrawAnomaly = detectors.overdraw.detect(
-    rollingMean10Min,
-    baselineHourlyMean,
-    transformerState.transformer.ID
-  );
-  if (overdrawAnomaly) anomalies.push(overdrawAnomaly);
-
-  const outageAnomaly = detectors.outage.detect(transformerLoadKw, transformerState.transformer.ID);
-  if (outageAnomaly) anomalies.push(outageAnomaly);
-
-  const feederPowerKw = transformerLoadKw * (1 + (Math.random() - 0.5) * 0.1);
-  const mismatchAnomaly = detectors.mismatch.detect(feederPowerKw, transformerLoadKw, transformerState.transformer.ID);
-  const mismatchRatio = Math.abs(feederPowerKw - transformerLoadKw) / Math.max(0.5, feederPowerKw);
-  transformerState.mismatchRatios.push({ timestamp: timestampMs, ratio: mismatchRatio });
-  transformerState.mismatchRatios = pruneHistory(transformerState.mismatchRatios);
-  if (mismatchAnomaly) anomalies.push(mismatchAnomaly);
 
   if (transformerLoadKw < 0.1) {
     transformerState.outageFlags.push({ timestamp: timestampMs, isOutage: true });
@@ -505,4 +522,96 @@ export async function getDashboardData(city: string): Promise<DashboardDataRespo
     refreshIntervalSeconds: REFRESH_INTERVAL_SECONDS,
     updatedAt: timestamp.toISOString(),
   };
+}
+
+// Artificial outage management
+export function triggerArtificialOutage(
+  city: string,
+  transformerId: string,
+  durationMinutes?: number
+): { success: boolean; message: string } {
+  try {
+    const store = getRealtimeStore();
+    const cityState = store.cities.get(city);
+
+    if (!cityState) {
+      return { success: false, message: `City ${city} not found` };
+    }
+
+    // Find transformer by ID
+    let transformerState: TransformerState | null = null;
+    for (const ts of cityState.transformers.values()) {
+      if (ts.transformer.ID === transformerId) {
+        transformerState = ts;
+        break;
+      }
+    }
+
+    if (!transformerState) {
+      return { success: false, message: `Transformer ${transformerId} not found` };
+    }
+
+    transformerState.artificialOutage = {
+      startTime: Date.now(),
+      duration: durationMinutes ? durationMinutes * 60 * 1000 : undefined,
+    };
+
+    return {
+      success: true,
+      message: `Artificial outage triggered for transformer ${transformerId}${durationMinutes ? ` for ${durationMinutes} minutes` : " (indefinite)"}`,
+    };
+  } catch (error) {
+    console.error("Error triggering artificial outage:", error);
+    return { success: false, message: "Failed to trigger artificial outage" };
+  }
+}
+
+export function clearArtificialOutage(city: string, transformerId: string): { success: boolean; message: string } {
+  try {
+    const store = getRealtimeStore();
+    const cityState = store.cities.get(city);
+
+    if (!cityState) {
+      return { success: false, message: `City ${city} not found` };
+    }
+
+    // Find transformer by ID
+    let transformerState: TransformerState | null = null;
+    for (const ts of cityState.transformers.values()) {
+      if (ts.transformer.ID === transformerId) {
+        transformerState = ts;
+        break;
+      }
+    }
+
+    if (!transformerState) {
+      return { success: false, message: `Transformer ${transformerId} not found` };
+    }
+
+    if (!transformerState.artificialOutage) {
+      return { success: true, message: `No active artificial outage for transformer ${transformerId}` };
+    }
+
+    delete transformerState.artificialOutage;
+
+    return { success: true, message: `Artificial outage cleared for transformer ${transformerId}` };
+  } catch (error) {
+    console.error("Error clearing artificial outage:", error);
+    return { success: false, message: "Failed to clear artificial outage" };
+  }
+}
+
+export function isTransformerInArtificialOutage(transformerState: TransformerState): boolean {
+  if (!transformerState.artificialOutage) return false;
+
+  const { startTime, duration } = transformerState.artificialOutage;
+  const elapsedTime = Date.now() - startTime;
+
+  // If duration is set and has expired, clear the outage
+  if (duration && elapsedTime > duration) {
+    delete transformerState.artificialOutage;
+    return false;
+  }
+
+  return true;
 }

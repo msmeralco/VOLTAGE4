@@ -10,6 +10,7 @@ import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Toolti
 import type { DashboardDataResponse, TransformerRealtimeMetrics } from "@/types/dashboard";
 import { Button } from "@/components/ui/button";
 import { generateBarangayReport } from "@/lib/pdf-export";
+import { generatePredictiveInsights } from "@/lib/mock-data";
 
 const BARANGAY = "UP Diliman";
 
@@ -59,6 +60,22 @@ export default function BarangayDashboard() {
     return dashboardData.transformers.find((item) => item.transformer.ID === selectedTransformerId);
   }, [dashboardData, selectedTransformerId]);
 
+  const barangayInsights = useMemo(() => {
+    if (!selectedTransformer || !dashboardData) return [];
+
+    const capacityEstimate = selectedTransformer.loadPercentage > 0
+      ? (selectedTransformer.currentLoadKw * 100) / selectedTransformer.loadPercentage
+      : (selectedTransformer.transformer.totalLoad ?? selectedTransformer.currentLoadKw * 2);
+
+    const transformerLike = {
+      name: selectedTransformer.transformer.ID,
+      currentLoad: selectedTransformer.currentLoadKw,
+      capacity: capacityEstimate,
+    } as any;
+
+    return generatePredictiveInsights(transformerLike, dashboardData.weather);
+  }, [selectedTransformer, dashboardData]);
+
   const loadData = useMemo(() => {
     if (!dashboardData) return [];
     return dashboardData.transformers
@@ -72,13 +89,35 @@ export default function BarangayDashboard() {
 
   const summary = dashboardData?.summary;
 
+  // console.log("Selected Transformer:", summary);
+
   const forecastChartData = selectedTransformer?.forecast.points.map((point) => ({
     ...point,
     label: `+${point.offsetHours}h`,
   })) ?? [];
 
+  console.log("🔍 Summary data:", summary);
+
+  // Collect all warnings from anomalies
+  const allWarnings = useMemo(() => {
+    if (!dashboardData) return [];
+    const warnings: { transformerId: string; anomaly: any }[] = [];
+    dashboardData.transformers.forEach((metric) => {
+      metric.recentAnomalies.forEach((anomaly) => {
+        warnings.push({
+          transformerId: metric.transformer.ID,
+          anomaly,
+        });
+      });
+    });
+    return warnings;
+  }, [dashboardData]);
+
   return (
-    <DashboardLayout title="Barangay Dashboard">
+    <DashboardLayout 
+      title="Barangay Dashboard" 
+      warnings={allWarnings.map((w) => w.anomaly)}
+    >
       <div className="space-y-6">
         <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
           <CardHeader className="pb-2">
@@ -106,7 +145,18 @@ export default function BarangayDashboard() {
                 {summary ? summary.status : "Loading"}
               </p>
             </div>
-            <Activity className="h-10 w-10 text-white/80" />
+
+            <div className="flex items-center space-x-6">
+              <div className="text-center">
+                <p className="text-xs text-white/80">Warnings</p>
+                <p className="text-lg font-semibold text-yellow-100">{summary ? summary.warningTransformers : "--"}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-white/80">Critical</p>
+                <p className="text-lg font-semibold text-red-100">{summary ? summary.criticalTransformers : "--"}</p>
+              </div>
+              <Activity className="h-10 w-10 text-white/80" />
+            </div>
           </CardContent>
         </Card>
 
@@ -126,6 +176,31 @@ export default function BarangayDashboard() {
                 selectedTransformerId={selectedTransformerId}
                 onTransformerSelect={setSelectedTransformerId}
               />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Predictive Insights</CardTitle>
+            <CardDescription>Realtime predictions and recommendations</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {(!dashboardData || !selectedTransformer) ? (
+              <p className="text-gray-500 text-center py-8">Select a transformer to see predictive insights</p>
+            ) : (
+              barangayInsights.length > 0 ? (
+                <div className="space-y-3">
+                  {barangayInsights.map((insight, idx) => (
+                    <div key={idx} className="flex items-start space-x-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                      <AlertTriangle className="h-5 w-5 text-orange-500 mt-0.5" />
+                      <p className="text-sm text-gray-700 dark:text-gray-300">{insight}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-8">No predictive insights available for the selected transformer</p>
+              )
             )}
           </CardContent>
         </Card>
