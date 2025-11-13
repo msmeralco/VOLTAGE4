@@ -65,6 +65,7 @@ interface TransformerState {
   forecaster: EWMAForecaster;
   capacityKw: number;
   lastUpdated: number;
+  artificialOutage?: { startTime: number; duration?: number };
 }
 
 interface CityState {
@@ -328,12 +329,18 @@ function updateTransformerState(
   const households = transformerState.householdIds.map((id) => cityState.households.get(id)!);
 
   let transformerLoadKw = 0;
+  
+  // Check if transformer is in artificial outage
+  const isInOutage = isTransformerInArtificialOutage(transformerState);
+
   households.forEach((household) => {
     const reading = getSmartMeterReading(household.id, timestamp, REFRESH_INTERVAL_SECONDS);
-    household.latestLoadKw = reading.loadKw;
-    household.loadHistory.push({ timestamp: reading.timestamp.getTime(), loadKw: reading.loadKw });
+    // Set load to 0 if in artificial outage
+    const householdLoad = isInOutage ? 0 : reading.loadKw;
+    household.latestLoadKw = householdLoad;
+    household.loadHistory.push({ timestamp: reading.timestamp.getTime(), loadKw: householdLoad });
     household.loadHistory = pruneHistory(household.loadHistory);
-    transformerLoadKw += reading.loadKw;
+    transformerLoadKw += householdLoad;
   });
 
   const timestampMs = timestamp.getTime();
@@ -489,4 +496,96 @@ export function getDashboardData(city: string): DashboardDataResponse {
     refreshIntervalSeconds: REFRESH_INTERVAL_SECONDS,
     updatedAt: timestamp.toISOString(),
   };
+}
+
+// Artificial outage management
+export function triggerArtificialOutage(
+  city: string,
+  transformerId: string,
+  durationMinutes?: number
+): { success: boolean; message: string } {
+  try {
+    const store = getRealtimeStore();
+    const cityState = store.cities.get(city);
+
+    if (!cityState) {
+      return { success: false, message: `City ${city} not found` };
+    }
+
+    // Find transformer by ID
+    let transformerState: TransformerState | null = null;
+    for (const ts of cityState.transformers.values()) {
+      if (ts.transformer.ID === transformerId) {
+        transformerState = ts;
+        break;
+      }
+    }
+
+    if (!transformerState) {
+      return { success: false, message: `Transformer ${transformerId} not found` };
+    }
+
+    transformerState.artificialOutage = {
+      startTime: Date.now(),
+      duration: durationMinutes ? durationMinutes * 60 * 1000 : undefined,
+    };
+
+    return {
+      success: true,
+      message: `Artificial outage triggered for transformer ${transformerId}${durationMinutes ? ` for ${durationMinutes} minutes` : " (indefinite)"}`,
+    };
+  } catch (error) {
+    console.error("Error triggering artificial outage:", error);
+    return { success: false, message: "Failed to trigger artificial outage" };
+  }
+}
+
+export function clearArtificialOutage(city: string, transformerId: string): { success: boolean; message: string } {
+  try {
+    const store = getRealtimeStore();
+    const cityState = store.cities.get(city);
+
+    if (!cityState) {
+      return { success: false, message: `City ${city} not found` };
+    }
+
+    // Find transformer by ID
+    let transformerState: TransformerState | null = null;
+    for (const ts of cityState.transformers.values()) {
+      if (ts.transformer.ID === transformerId) {
+        transformerState = ts;
+        break;
+      }
+    }
+
+    if (!transformerState) {
+      return { success: false, message: `Transformer ${transformerId} not found` };
+    }
+
+    if (!transformerState.artificialOutage) {
+      return { success: true, message: `No active artificial outage for transformer ${transformerId}` };
+    }
+
+    delete transformerState.artificialOutage;
+
+    return { success: true, message: `Artificial outage cleared for transformer ${transformerId}` };
+  } catch (error) {
+    console.error("Error clearing artificial outage:", error);
+    return { success: false, message: "Failed to clear artificial outage" };
+  }
+}
+
+export function isTransformerInArtificialOutage(transformerState: TransformerState): boolean {
+  if (!transformerState.artificialOutage) return false;
+
+  const { startTime, duration } = transformerState.artificialOutage;
+  const elapsedTime = Date.now() - startTime;
+
+  // If duration is set and has expired, clear the outage
+  if (duration && elapsedTime > duration) {
+    delete transformerState.artificialOutage;
+    return false;
+  }
+
+  return true;
 }

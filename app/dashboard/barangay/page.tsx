@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, Zap, Activity } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, AreaChart, Area } from "recharts";
 import type { DashboardDataResponse, TransformerRealtimeMetrics } from "@/types/dashboard";
+import { generatePredictiveInsights } from "@/lib/mock-data";
 
 const BARANGAY = "UP Diliman";
 
@@ -56,6 +57,22 @@ export default function BarangayDashboard() {
     if (!dashboardData || !selectedTransformerId) return undefined;
     return dashboardData.transformers.find((item) => item.transformer.ID === selectedTransformerId);
   }, [dashboardData, selectedTransformerId]);
+
+  const barangayInsights = useMemo(() => {
+    if (!selectedTransformer || !dashboardData) return [];
+
+    const capacityEstimate = selectedTransformer.loadPercentage > 0
+      ? (selectedTransformer.currentLoadKw * 100) / selectedTransformer.loadPercentage
+      : (selectedTransformer.transformer.totalLoad ?? selectedTransformer.currentLoadKw * 2);
+
+    const transformerLike = {
+      name: selectedTransformer.transformer.ID,
+      currentLoad: selectedTransformer.currentLoadKw,
+      capacity: capacityEstimate,
+    } as any;
+
+    return generatePredictiveInsights(transformerLike, dashboardData.weather);
+  }, [selectedTransformer, dashboardData]);
 
   const loadData = useMemo(() => {
     if (!dashboardData) return [];
@@ -110,6 +127,31 @@ export default function BarangayDashboard() {
                 selectedTransformerId={selectedTransformerId}
                 onTransformerSelect={setSelectedTransformerId}
               />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Predictive Insights</CardTitle>
+            <CardDescription>Realtime predictions and recommendations</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {(!dashboardData || !selectedTransformer) ? (
+              <p className="text-gray-500 text-center py-8">Select a transformer to see predictive insights</p>
+            ) : (
+              barangayInsights.length > 0 ? (
+                <div className="space-y-3">
+                  {barangayInsights.map((insight, idx) => (
+                    <div key={idx} className="flex items-start space-x-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                      <AlertTriangle className="h-5 w-5 text-orange-500 mt-0.5" />
+                      <p className="text-sm text-gray-700 dark:text-gray-300">{insight}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-8">No predictive insights available for the selected transformer</p>
+              )
             )}
           </CardContent>
         </Card>
