@@ -14,6 +14,14 @@ export interface BGHIResult {
   deterioration: number;
   status: "Good" | "Warning" | "Critical";
   color: "green" | "amber" | "red";
+  components: {
+    loadStress: number;
+    outageScore: number;
+    powerQuality: number;
+    anomalyFrequency: number;
+    environmentalStress: number;
+    mismatchScore: number;
+  };
 }
 
 const DEFAULT_WEIGHTS: BGHIWeights = {
@@ -120,5 +128,6 @@ export function calculateBGHI(
     deterioration: Number(deterioration.toFixed(2)),
     status,
     color,
+    components,
   };
 }
