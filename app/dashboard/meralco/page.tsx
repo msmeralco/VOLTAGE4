@@ -34,6 +34,8 @@ import {
   Area,
 } from "recharts";
 import type { DashboardDataResponse, TransformerRealtimeMetrics } from "@/types/dashboard";
+import { generateTransformerAlerts } from "@/lib/alerts";
+import type { AnomalySeverity } from "@/lib/anomaly";
 
 const allCities = [...cities];
 
@@ -73,6 +75,19 @@ export default function MeralcoDashboard() {
   const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState<number>(15);
 
   const isCSVMode = selectedCity === "Quezon City";
+
+  const notificationAlerts = useMemo(() => {
+    if (!dashboardData) return [];
+    const severityRank: Record<AnomalySeverity, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+    return dashboardData.transformers
+      .flatMap((metric) => generateTransformerAlerts(metric))
+      .sort((a, b) => {
+        const severityDelta = severityRank[a.severity] - severityRank[b.severity];
+        if (severityDelta !== 0) return severityDelta;
+        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      })
+      .slice(0, 20);
+  }, [dashboardData]);
 
   const fetchLegacyData = useCallback(async (city: string) => {
     setLegacyData((prev) => ({ ...prev, loading: true }));
@@ -717,11 +732,7 @@ export default function MeralcoDashboard() {
   return (
     <DashboardLayout 
       title="Meralco Dashboard"
-      warnings={
-        dashboardData?.transformers
-          .flatMap((metric) => metric.recentAnomalies)
-          .slice(0, 20) || []
-      }
+      warnings={notificationAlerts}
     >
       <div className="space-y-6">
         <Card>

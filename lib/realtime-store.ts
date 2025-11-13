@@ -316,8 +316,14 @@ function aggregateSummary(
   const avgBGHI = metrics.reduce((acc, metric) => acc + metric.bghi.bghiScore, 0) / metrics.length;
   const avgLoadPct = metrics.reduce((acc, metric) => acc + metric.loadPercentage, 0) / metrics.length;
 
-  const warningTransformers = metrics.filter((metric) => metric.bghi.status === "Warning").length;
-  const criticalTransformers = metrics.filter((metric) => metric.bghi.status === "Critical").length;
+  const criticalTransformers = metrics.filter(
+    (metric) => metric.loadPercentage >= 95
+  ).length;
+  const warningTransformers = metrics.filter(
+    (metric) =>
+      metric.loadPercentage >= 65 &&
+      metric.loadPercentage < 95
+  ).length;
 
   return {
     bghiScore: Number(avgBGHI.toFixed(2)),

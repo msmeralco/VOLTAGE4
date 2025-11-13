@@ -11,6 +11,8 @@ import type { DashboardDataResponse, TransformerRealtimeMetrics } from "@/types/
 import { Button } from "@/components/ui/button";
 import { generateBarangayReport } from "@/lib/pdf-export";
 import { generatePredictiveInsights } from "@/lib/mock-data";
+import { generateTransformerAlerts } from "@/lib/alerts";
+import type { AnomalySeverity } from "@/lib/anomaly";
 
 const BARANGAY = "UP Diliman";
 
@@ -98,25 +100,23 @@ export default function BarangayDashboard() {
 
   console.log("🔍 Summary data:", summary);
 
-  // Collect all warnings from anomalies
-  const allWarnings = useMemo(() => {
+  const notificationAlerts = useMemo(() => {
     if (!dashboardData) return [];
-    const warnings: { transformerId: string; anomaly: any }[] = [];
-    dashboardData.transformers.forEach((metric) => {
-      metric.recentAnomalies.forEach((anomaly) => {
-        warnings.push({
-          transformerId: metric.transformer.ID,
-          anomaly,
-        });
-      });
-    });
-    return warnings;
+    const severityRank: Record<AnomalySeverity, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+    return dashboardData.transformers
+      .flatMap((metric) => generateTransformerAlerts(metric))
+      .sort((a, b) => {
+        const severityDelta = severityRank[a.severity] - severityRank[b.severity];
+        if (severityDelta !== 0) return severityDelta;
+        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      })
+      .slice(0, 20);
   }, [dashboardData]);
 
   return (
     <DashboardLayout 
       title="Barangay Dashboard" 
-      warnings={allWarnings.map((w) => w.anomaly)}
+      warnings={notificationAlerts}
     >
       <div className="space-y-6">
         <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
