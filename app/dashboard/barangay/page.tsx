@@ -87,13 +87,35 @@ export default function BarangayDashboard() {
 
   const summary = dashboardData?.summary;
 
+  // console.log("Selected Transformer:", summary);
+
   const forecastChartData = selectedTransformer?.forecast.points.map((point) => ({
     ...point,
     label: `+${point.offsetHours}h`,
   })) ?? [];
 
+  console.log("🔍 Summary data:", summary);
+
+  // Collect all warnings from anomalies
+  const allWarnings = useMemo(() => {
+    if (!dashboardData) return [];
+    const warnings: { transformerId: string; anomaly: any }[] = [];
+    dashboardData.transformers.forEach((metric) => {
+      metric.recentAnomalies.forEach((anomaly) => {
+        warnings.push({
+          transformerId: metric.transformer.ID,
+          anomaly,
+        });
+      });
+    });
+    return warnings;
+  }, [dashboardData]);
+
   return (
-    <DashboardLayout title="Barangay Dashboard">
+    <DashboardLayout 
+      title="Barangay Dashboard" 
+      warnings={allWarnings.map((w) => w.anomaly)}
+    >
       <div className="space-y-6">
         <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
           <CardHeader className="pb-2">
@@ -107,7 +129,18 @@ export default function BarangayDashboard() {
                 {summary ? summary.status : "Loading"}
               </p>
             </div>
-            <Activity className="h-10 w-10 text-white/80" />
+
+            <div className="flex items-center space-x-6">
+              <div className="text-center">
+                <p className="text-xs text-white/80">Warnings</p>
+                <p className="text-lg font-semibold text-yellow-100">{summary ? summary.warningTransformers : "--"}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-white/80">Critical</p>
+                <p className="text-lg font-semibold text-red-100">{summary ? summary.criticalTransformers : "--"}</p>
+              </div>
+              <Activity className="h-10 w-10 text-white/80" />
+            </div>
           </CardContent>
         </Card>
 

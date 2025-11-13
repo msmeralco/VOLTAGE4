@@ -713,7 +713,14 @@ export default function MeralcoDashboard() {
   );
 
   return (
-    <DashboardLayout title="Meralco Dashboard">
+    <DashboardLayout 
+      title="Meralco Dashboard"
+      warnings={
+        dashboardData?.transformers
+          .flatMap((metric) => metric.recentAnomalies)
+          .slice(0, 20) || []
+      }
+    >
       <div className="space-y-6">
         <Card>
           <CardHeader>

@@ -354,29 +354,39 @@ function updateTransformerState(
 
   const anomalies: Anomaly[] = [];
   const { detectors } = transformerState;
+  let mismatchRatio = 0;
 
-  const spikeAnomaly = detectors.spike.detect(transformerLoadKw, transformerState.rollingStats, transformerState.transformer.ID);
-  if (spikeAnomaly) {
-    transformerState.spikeEvents.push(timestampMs);
-    anomalies.push(spikeAnomaly);
+  // Only detect anomalies for Pole/Pad Transformers
+  if (transformerState.transformer.EntityType === "PolePadTransformer") {
+    const spikeAnomaly = detectors.spike.detect(transformerLoadKw, transformerState.rollingStats, transformerState.transformer.ID);
+    if (spikeAnomaly) {
+      transformerState.spikeEvents.push(timestampMs);
+      anomalies.push(spikeAnomaly);
+    }
+
+    const overdrawAnomaly = detectors.overdraw.detect(
+      rollingMean10Min,
+      baselineHourlyMean,
+      transformerState.transformer.ID
+    );
+    if (overdrawAnomaly) anomalies.push(overdrawAnomaly);
+
+    const outageAnomaly = detectors.outage.detect(transformerLoadKw, transformerState.transformer.ID);
+    if (outageAnomaly) anomalies.push(outageAnomaly);
+
+    const feederPowerKw = transformerLoadKw * (1 + (Math.random() - 0.5) * 0.1);
+    const mismatchAnomaly = detectors.mismatch.detect(feederPowerKw, transformerLoadKw, transformerState.transformer.ID);
+    mismatchRatio = Math.abs(feederPowerKw - transformerLoadKw) / Math.max(0.5, feederPowerKw);
+    transformerState.mismatchRatios.push({ timestamp: timestampMs, ratio: mismatchRatio });
+    transformerState.mismatchRatios = pruneHistory(transformerState.mismatchRatios);
+    if (mismatchAnomaly) anomalies.push(mismatchAnomaly);
+  } else {
+    // For Substation Transformers, only track mismatch ratio without anomaly detection
+    const feederPowerKw = transformerLoadKw * (1 + (Math.random() - 0.5) * 0.1);
+    mismatchRatio = Math.abs(feederPowerKw - transformerLoadKw) / Math.max(0.5, feederPowerKw);
+    transformerState.mismatchRatios.push({ timestamp: timestampMs, ratio: mismatchRatio });
+    transformerState.mismatchRatios = pruneHistory(transformerState.mismatchRatios);
   }
-
-  const overdrawAnomaly = detectors.overdraw.detect(
-    rollingMean10Min,
-    baselineHourlyMean,
-    transformerState.transformer.ID
-  );
-  if (overdrawAnomaly) anomalies.push(overdrawAnomaly);
-
-  const outageAnomaly = detectors.outage.detect(transformerLoadKw, transformerState.transformer.ID);
-  if (outageAnomaly) anomalies.push(outageAnomaly);
-
-  const feederPowerKw = transformerLoadKw * (1 + (Math.random() - 0.5) * 0.1);
-  const mismatchAnomaly = detectors.mismatch.detect(feederPowerKw, transformerLoadKw, transformerState.transformer.ID);
-  const mismatchRatio = Math.abs(feederPowerKw - transformerLoadKw) / Math.max(0.5, feederPowerKw);
-  transformerState.mismatchRatios.push({ timestamp: timestampMs, ratio: mismatchRatio });
-  transformerState.mismatchRatios = pruneHistory(transformerState.mismatchRatios);
-  if (mismatchAnomaly) anomalies.push(mismatchAnomaly);
 
   if (transformerLoadKw < 0.1) {
     transformerState.outageFlags.push({ timestamp: timestampMs, isOutage: true });
