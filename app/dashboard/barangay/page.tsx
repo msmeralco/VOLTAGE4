@@ -150,17 +150,18 @@ export default function BarangayDashboard() {
   }, [dashboardData]);
 
   return (
-    <DashboardLayout
-      title="Barangay Dashboard" 
+    <DashboardLayout 
+      role="barangay"
+      title="" 
       warnings={allWarnings.map((w) => w.anomaly)}
     >
-      <div className="space-y-6">
-        <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
+      <div className="space-y-6 pt-6">
+        <Card className="bg-gradient-to-br from-[#ff7a1a] to-orange-500 text-white">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-medium">Barangay Grid Health Index</CardTitle>
-                <CardDescription className="text-orange-100">Barangay {BARANGAY}</CardDescription>
+                <CardDescription className="text-white">Barangay {BARANGAY}</CardDescription>
               </div>
               {dashboardData && (
                 <Button
@@ -304,7 +305,7 @@ export default function BarangayDashboard() {
             <CardTitle>Barangay Grid Map</CardTitle>
             <CardDescription>Transformers and connected households within {BARANGAY}</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="relative z-0">
             {isLoading || !dashboardData ? (
               <div className="h-[600px] flex items-center justify-center">
                 <p className="text-gray-500">Loading barangay data...</p>
