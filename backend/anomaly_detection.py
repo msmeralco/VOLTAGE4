@@ -236,16 +236,27 @@ class SustainedOverdrawDetector:
 
 
 class OutageDetector:
-    """Detects power outages"""
+    """
+    Detects power outages (total loss of supply)
+    
+    Spec: P_inst <= 5W continuously for >= T_outage
+    - Production: T_outage = 1800s (30 min)
+    - Demo: T_outage = 6-30s (fast feedback)
+    """
     
     def __init__(
         self,
-        outage_threshold_w: float = 5.0,
-        min_duration_seconds: float = 30.0
+        outage_threshold_w: float = 5.0,  # Per spec: P_min = 5W
+        min_duration_seconds: float = 30.0,  # Demo mode: 30s (use 1800 for production)
+        min_consecutive_samples: int = 3  # Require at least 3 consecutive low readings
     ):
         self.outage_threshold_w = outage_threshold_w
         self.min_duration_seconds = min_duration_seconds
+        self.min_consecutive_samples = min_consecutive_samples
         self.outage_start: Optional[datetime] = None
+        self.consecutive_low_readings = 0
+        self.last_alert_time: Optional[datetime] = None  # Prevent spam
+        self.alert_cooldown_seconds = 300.0  # 5 min cooldown between alerts
     
     def detect(
         self,
@@ -255,32 +266,53 @@ class OutageDetector:
         """
         Detect outage: power below threshold for sustained period
         
+        Spec compliance:
+        - Triggers when P_inst <= 5W continuously for >= T_outage seconds
+        - Requires multiple consecutive samples to avoid single bad readings
+        - Has cooldown period to prevent alert spam
+        
         Args:
             current_value: Latest power reading (W)
             zone_id: Zone identifier
         
         Returns:
-            Anomaly if outage detected
+            Anomaly if outage detected, None otherwise
         """
-        if current_value < self.outage_threshold_w:
+        # Check cooldown (prevent spamming same outage alert)
+        if self.last_alert_time is not None:
+            time_since_last = (datetime.utcnow() - self.last_alert_time).total_seconds()
+            if time_since_last < self.alert_cooldown_seconds:
+                return None  # Still in cooldown period
+        
+        if current_value <= self.outage_threshold_w:
+            self.consecutive_low_readings += 1
+            
             if self.outage_start is None:
                 self.outage_start = datetime.utcnow()
             
             duration = (datetime.utcnow() - self.outage_start).total_seconds()
             
-            if duration >= self.min_duration_seconds:
+            # Per spec: continuous low power for >= T_outage AND multiple samples
+            if (duration >= self.min_duration_seconds and 
+                self.consecutive_low_readings >= self.min_consecutive_samples):
+                
                 evidence = AnomalyEvidence(
                     mean=current_value,
                     std=0.0,
                     z_score=0.0,
                     duration_seconds=duration,
                     threshold=self.outage_threshold_w,
-                    samples_analyzed=0
+                    samples_analyzed=self.consecutive_low_readings
                 )
                 
                 # Outages are always high severity
                 severity = "HIGH"
                 confidence = 0.95
+                
+                # Set cooldown and reset counters
+                self.last_alert_time = datetime.utcnow()
+                self.outage_start = None
+                self.consecutive_low_readings = 0
                 
                 return Anomaly(
                     anomaly_type="OUTAGE",
@@ -292,11 +324,10 @@ class OutageDetector:
                     recommended_action="Power outage detected. Dispatch crew immediately. Notify affected residents."
                 )
         else:
-            # Reset if power restored
-            if self.outage_start is not None:
-                # Could log restoration event here
-                pass
+            # Power restored - reset all counters and clear cooldown
             self.outage_start = None
+            self.consecutive_low_readings = 0
+            self.last_alert_time = None  # Clear cooldown when power restored
         
         return None
 

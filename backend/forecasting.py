@@ -114,14 +114,16 @@ class EWMAForecaster:
     
     def _classify_risk(self, risk_ratio: float) -> str:
         """Classify risk level based on ratio"""
-        if risk_ratio >= 0.95:
+        if risk_ratio >= 0.90:
             return "CRITICAL"
-        elif risk_ratio >= 0.85:
+        elif risk_ratio >= 0.80:
             return "HIGH"
-        elif risk_ratio >= 0.75:
+        elif risk_ratio >= 0.70:
             return "MODERATE"
-        else:
+        elif risk_ratio >= 0.50:
             return "LOW"
+        else:
+            return "MINIMAL"
     
     def find_peak_risk(self, predictions: List[Dict]) -> Dict:
         """
