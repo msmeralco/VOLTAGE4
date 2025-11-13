@@ -43,6 +43,11 @@ function createSyntheticAlert(
 }
 
 export function generateTransformerAlerts(metric: TransformerRealtimeMetrics): Anomaly[] {
+  // Exclude SubstationTransformer from alerts
+  if (metric.transformer.EntityType === "SubstationTransformer") {
+    return [];
+  }
+
   const alerts: Anomaly[] = [...metric.recentAnomalies];
   const hasType = (type: string) => alerts.some((alert) => alert.anomalyType === type);
 
