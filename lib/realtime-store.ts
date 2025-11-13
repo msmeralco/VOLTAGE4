@@ -302,16 +302,56 @@ function aggregateSummary(
     };
   }
 
-  const avgBGHI = metrics.reduce((acc, metric) => acc + metric.bghi.bghiScore, 0) / metrics.length;
+  // Calculate weighted BGHI based on transformer importance and urgency
+  let weightedSum = 0;
+  let totalWeight = 0;
+
+  for (const metric of metrics) {
+    // Weight by number of households served (more households = higher impact)
+    const householdWeight = metric.transformer.NumDownstreamBuildings || 1;
+    
+    // Apply urgency multiplier based on transformer health status
+    // Critical transformers get 3x weight, Warning get 1.5x, Good get 1x
+    const urgencyMultiplier = 
+      metric.bghi.status === "Critical" ? 3.0 : 
+      metric.bghi.status === "Warning" ? 1.5 : 
+      1.0;
+    
+    const effectiveWeight = householdWeight * urgencyMultiplier;
+    
+    weightedSum += metric.bghi.bghiScore * effectiveWeight;
+    totalWeight += effectiveWeight;
+  }
+
+  const weightedBGHI = totalWeight > 0 ? weightedSum / totalWeight : 100;
   const avgLoadPct = metrics.reduce((acc, metric) => acc + metric.loadPercentage, 0) / metrics.length;
 
   const warningTransformers = metrics.filter((metric) => metric.bghi.status === "Warning").length;
   const criticalTransformers = metrics.filter((metric) => metric.bghi.status === "Critical").length;
 
+  // Determine barangay-level status based on weighted BGHI and transformer distribution
+  let barangayStatus: "Good" | "Warning" | "Critical";
+  let barangayColor: "green" | "amber" | "red";
+
+  // Escalate to warning if 30%+ of transformers are in warning state
+  if (warningTransformers >= metrics.length * 0.3) {
+    barangayStatus = "Warning";
+    barangayColor = "amber";
+  } else if (weightedBGHI >= 80) {
+    barangayStatus = "Good";
+    barangayColor = "green";
+  } else if (weightedBGHI >= 60) {
+    barangayStatus = "Warning";
+    barangayColor = "amber";
+  } else {
+    barangayStatus = "Critical";
+    barangayColor = "red";
+  }
+
   return {
-    bghiScore: Number(avgBGHI.toFixed(2)),
-    status: avgBGHI >= 80 ? "Good" : avgBGHI >= 60 ? "Warning" : "Critical",
-    color: avgBGHI >= 80 ? "green" : avgBGHI >= 60 ? "amber" : "red",
+    bghiScore: Number(Math.max(0, weightedBGHI).toFixed(2)),
+    status: barangayStatus,
+    color: barangayColor,
     totalTransformers: metrics.length,
     warningTransformers,
     criticalTransformers,
