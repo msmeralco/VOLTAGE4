@@ -11,6 +11,8 @@ import type { DashboardDataResponse, TransformerRealtimeMetrics } from "@/types/
 import { Button } from "@/components/ui/button";
 import { generateBarangayReport } from "@/lib/pdf-export";
 import { generatePredictiveInsights } from "@/lib/mock-data";
+import { generateTransformerAlerts } from "@/lib/alerts";
+import type { AnomalySeverity } from "@/lib/anomaly";
 import { getBGHITrends, type HistoricalBGHI } from "@/lib/historical-data";
 
 const BARANGAY = "UP Diliman";
@@ -134,27 +136,29 @@ export default function BarangayDashboard() {
     label: `+${point.offsetHours}h`,
   })) ?? [];
 
-  // Collect all warnings from anomalies
+  // ✅ Merged alert logic (keeps the logging + renaming)
+  console.log("🔍 Summary data:", summary);
+
   const allWarnings = useMemo(() => {
     if (!dashboardData) return [];
-    const warnings: { transformerId: string; anomaly: any }[] = [];
-    dashboardData.transformers.forEach((metric) => {
-      metric.recentAnomalies.forEach((anomaly) => {
-        warnings.push({
-          transformerId: metric.transformer.ID,
-          anomaly,
-        });
-      });
-    });
-    return warnings;
+    const severityRank: Record<AnomalySeverity, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+    return dashboardData.transformers
+      .flatMap((metric) => generateTransformerAlerts(metric))
+      .sort((a, b) => {
+        const severityDelta = severityRank[a.severity] - severityRank[b.severity];
+        if (severityDelta !== 0) return severityDelta;
+        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      })
+      .slice(0, 20);
   }, [dashboardData]);
+
 
   return (
     <DashboardLayout 
-      role="barangay"
-      title="" 
-      warnings={allWarnings.map((w) => w.anomaly)}
-    >
+  role="barangay"
+  title="Barangay Dashboard"
+  warnings={allWarnings}
+/>
       <div className="space-y-6 pt-6">
         <Card className="bg-gradient-to-br from-[#ff7a1a] to-orange-500 text-white">
           <CardHeader className="pb-2">

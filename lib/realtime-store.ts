@@ -30,6 +30,8 @@ import { generateMockWeather, type WeatherData } from "@/lib/mock-data";
 import { fetchRealWeather } from "@/lib/weather-api";
 import { getSmartMeterReading } from "@/lib/smart-meter";
 import type {
+  ArtificialDisasterInfo,
+  ArtificialDisasterKind,
   DashboardDataResponse,
   DashboardSummary,
   HouseholdRealtime,
@@ -67,6 +69,7 @@ interface TransformerState {
   capacityKw: number;
   lastUpdated: number;
   artificialOutage?: { startTime: number; duration?: number };
+  artificialDisaster?: ArtificialDisasterState;
 }
 
 interface CityState {
@@ -77,6 +80,14 @@ interface CityState {
 
 interface RealtimeStore {
   cities: Map<string, CityState>;
+}
+
+interface ArtificialDisasterState {
+  kind: ArtificialDisasterKind;
+  startTime: number;
+  duration?: number;
+  parameters?: Record<string, number>;
+  notes?: string;
 }
 
 declare global {
@@ -326,8 +337,14 @@ function aggregateSummary(
   const weightedBGHI = totalWeight > 0 ? weightedSum / totalWeight : 100;
   const avgLoadPct = metrics.reduce((acc, metric) => acc + metric.loadPercentage, 0) / metrics.length;
 
-  const warningTransformers = metrics.filter((metric) => metric.bghi.status === "Warning").length;
-  const criticalTransformers = metrics.filter((metric) => metric.bghi.status === "Critical").length;
+  const criticalTransformers = metrics.filter(
+    (metric) => metric.loadPercentage >= 95
+  ).length;
+  const warningTransformers = metrics.filter(
+    (metric) =>
+      metric.loadPercentage >= 65 &&
+      metric.loadPercentage < 95
+  ).length;
 
   // Determine barangay-level status based on weighted BGHI and transformer distribution
   let barangayStatus: "Good" | "Warning" | "Critical";
@@ -373,16 +390,35 @@ function updateTransformerState(
   
   // Check if transformer is in artificial outage
   const isInOutage = isTransformerInArtificialOutage(transformerState);
+  const activeDisaster = getActiveArtificialDisaster(transformerState);
+  let forcedDisasterOutage = false;
+  let disasterMismatchBias = 0;
 
   households.forEach((household) => {
     const reading = getSmartMeterReading(household.id, timestamp, REFRESH_INTERVAL_SECONDS);
     // Set load to 0 if in artificial outage
-    const householdLoad = isInOutage ? 0 : reading.loadKw;
+    let householdLoad = isInOutage ? 0 : reading.loadKw;
+
+    if (!isInOutage && activeDisaster) {
+      const effect = applyArtificialDisasterEffects(activeDisaster, householdLoad, transformerState.capacityKw);
+      householdLoad = effect.loadKw;
+      if (effect.forceOutage) {
+        forcedDisasterOutage = true;
+      }
+      if (typeof effect.mismatchBias === "number") {
+        disasterMismatchBias = Math.max(disasterMismatchBias, effect.mismatchBias);
+      }
+    }
+
     household.latestLoadKw = householdLoad;
     household.loadHistory.push({ timestamp: reading.timestamp.getTime(), loadKw: householdLoad });
     household.loadHistory = pruneHistory(household.loadHistory);
     transformerLoadKw += householdLoad;
   });
+
+  if (forcedDisasterOutage) {
+    transformerLoadKw = 0;
+  }
 
   const timestampMs = timestamp.getTime();
   transformerState.history.push({ timestamp: timestampMs, loadKw: transformerLoadKw });
@@ -429,7 +465,15 @@ function updateTransformerState(
     transformerState.mismatchRatios = pruneHistory(transformerState.mismatchRatios);
   }
 
-  if (transformerLoadKw < 0.1) {
+  if (disasterMismatchBias && transformerState.mismatchRatios.length) {
+    const lastEntry = transformerState.mismatchRatios[transformerState.mismatchRatios.length - 1];
+    lastEntry.ratio = Math.min(1, lastEntry.ratio + disasterMismatchBias);
+    mismatchRatio = lastEntry.ratio;
+  }
+
+  const effectiveOutage = isInOutage || forcedDisasterOutage || transformerLoadKw < 0.1;
+
+  if (effectiveOutage) {
     transformerState.outageFlags.push({ timestamp: timestampMs, isOutage: true });
   } else {
     transformerState.outageFlags.push({ timestamp: timestampMs, isOutage: false });
@@ -506,6 +550,8 @@ function updateTransformerState(
     spikeEvents24h,
     mismatchRatio: Number(mismatchRatio.toFixed(3)),
     lastUpdated: new Date(transformerState.lastUpdated).toISOString(),
+    artificialOutageActive: effectiveOutage,
+    artificialDisaster: activeDisaster ? mapDisasterStateToInfo(activeDisaster) : null,
   };
 
   return { metrics: realtimeMetrics, alerts: overloadAlert ?? null };
@@ -654,4 +700,248 @@ export function isTransformerInArtificialOutage(transformerState: TransformerSta
   }
 
   return true;
+}
+
+export function triggerArtificialDisaster(
+  city: string,
+  kind: ArtificialDisasterKind,
+  options: {
+    transformerId?: string;
+    durationMinutes?: number;
+    parameters?: Record<string, number>;
+    notes?: string;
+  } = {}
+): {
+  success: boolean;
+  message: string;
+  transformersAffected: string[];
+  disaster?: ArtificialDisasterInfo;
+  disasters?: ArtificialDisasterInfo[];
+} {
+  try {
+    const store = getRealtimeStore();
+    const cityState = store.cities.get(city);
+
+    if (!cityState) {
+      return { success: false, message: `City ${city} not found`, transformersAffected: [] };
+    }
+
+    const duration = options.durationMinutes ? options.durationMinutes * 60 * 1000 : undefined;
+    const startTime = Date.now();
+    const targets: TransformerState[] = [];
+
+    if (options.transformerId) {
+      const transformerState = findTransformerState(cityState, options.transformerId);
+      if (!transformerState) {
+        return { success: false, message: `Transformer ${options.transformerId} not found`, transformersAffected: [] };
+      }
+      targets.push(transformerState);
+    } else {
+      cityState.transformers.forEach((ts) => targets.push(ts));
+    }
+
+    if (!targets.length) {
+      return { success: false, message: `No transformers available in ${city}`, transformersAffected: [] };
+    }
+
+    const disastersApplied: ArtificialDisasterInfo[] = [];
+    targets.forEach((transformerState) => {
+      transformerState.artificialDisaster = {
+        kind,
+        startTime,
+        duration,
+        parameters: options.parameters,
+        notes: options.notes,
+      };
+      disastersApplied.push(mapDisasterStateToInfo(transformerState.artificialDisaster));
+    });
+
+    const transformersAffected = targets.map((ts) => ts.transformer.ID);
+    const durationText = options.durationMinutes ? ` for ${options.durationMinutes} minutes` : " (indefinite)";
+    const message = options.transformerId
+      ? `Artificial disaster (${kind}) activated for transformer ${options.transformerId}${durationText}`
+      : `Artificial disaster (${kind}) activated for ${targets.length} transformers in ${city}${durationText}`;
+
+    return {
+      success: true,
+      message,
+      transformersAffected,
+      disaster: options.transformerId ? disastersApplied[0] : undefined,
+      disasters: options.transformerId ? undefined : disastersApplied,
+    };
+  } catch (error) {
+    console.error("Error triggering artificial disaster:", error);
+    return { success: false, message: "Failed to trigger artificial disaster", transformersAffected: [] };
+  }
+}
+
+export function clearArtificialDisaster(
+  city: string,
+  transformerId?: string
+): { success: boolean; message: string; transformersAffected: string[] } {
+  try {
+    const store = getRealtimeStore();
+    const cityState = store.cities.get(city);
+
+    if (!cityState) {
+      return { success: false, message: `City ${city} not found`, transformersAffected: [] };
+    }
+
+    const targets: TransformerState[] = [];
+    if (transformerId) {
+      const transformerState = findTransformerState(cityState, transformerId);
+      if (!transformerState) {
+        return { success: false, message: `Transformer ${transformerId} not found`, transformersAffected: [] };
+      }
+      targets.push(transformerState);
+    } else {
+      cityState.transformers.forEach((ts) => targets.push(ts));
+    }
+
+    const cleared: string[] = [];
+    targets.forEach((transformerState) => {
+      if (transformerState.artificialDisaster) {
+        cleared.push(transformerState.transformer.ID);
+        delete transformerState.artificialDisaster;
+      }
+    });
+
+    if (transformerId) {
+      if (!cleared.length) {
+        return {
+          success: true,
+          message: `No active artificial disaster for transformer ${transformerId}`,
+          transformersAffected: [],
+        };
+      }
+      return {
+        success: true,
+        message: `Artificial disaster cleared for transformer ${transformerId}`,
+        transformersAffected: cleared,
+      };
+    }
+
+    if (!cleared.length) {
+      return { success: true, message: `No active artificial disasters in ${city}`, transformersAffected: [] };
+    }
+
+    return {
+      success: true,
+      message: `Artificial disaster cleared for ${cleared.length} transformers in ${city}`,
+      transformersAffected: cleared,
+    };
+  } catch (error) {
+    console.error("Error clearing artificial disaster:", error);
+    return { success: false, message: "Failed to clear artificial disaster", transformersAffected: [] };
+  }
+}
+
+function getActiveArtificialDisaster(transformerState: TransformerState): ArtificialDisasterState | null {
+  const disaster = transformerState.artificialDisaster;
+  if (!disaster) return null;
+
+  if (disaster.duration) {
+    const elapsed = Date.now() - disaster.startTime;
+    if (elapsed > disaster.duration) {
+      delete transformerState.artificialDisaster;
+      return null;
+    }
+  }
+
+  return disaster;
+}
+
+function applyArtificialDisasterEffects(
+  disaster: ArtificialDisasterState,
+  baseLoadKw: number,
+  transformerCapacityKw: number
+): { loadKw: number; forceOutage: boolean; mismatchBias?: number } {
+  const params = disaster.parameters ?? {};
+
+  switch (disaster.kind) {
+    case "heatwave": {
+      const multiplier = params.loadMultiplier ?? 1.35;
+      const variability = params.variability ?? 0.08;
+      const variationFactor = 1 + (Math.random() - 0.5) * variability * 2;
+      const adjusted = Math.min(transformerCapacityKw * 1.3, baseLoadKw * multiplier * variationFactor);
+      return {
+        loadKw: Math.max(0, adjusted),
+        forceOutage: false,
+        mismatchBias: params.mismatchBias ?? 0.05,
+      };
+    }
+    case "typhoon": {
+      const outageChance = params.householdOutageChance ?? 0.25;
+      const fluctuation = params.loadFluctuation ?? 0.5;
+      if (Math.random() < outageChance) {
+        return { loadKw: 0, forceOutage: false, mismatchBias: params.mismatchBias ?? 0.15 };
+      }
+      const adjusted = baseLoadKw * (0.5 + Math.random() * fluctuation);
+      return {
+        loadKw: Math.max(0, adjusted),
+        forceOutage: false,
+        mismatchBias: params.mismatchBias ?? 0.15,
+      };
+    }
+    case "earthquake": {
+      const damageSeverity = Math.min(1, params.damageSeverity ?? 0.8);
+      const forceOutage = Math.random() < damageSeverity;
+      const capacityFraction = Math.max(0, 1 - damageSeverity * 0.85);
+      const adjusted = forceOutage ? 0 : baseLoadKw * capacityFraction;
+      return {
+        loadKw: Math.max(0, adjusted),
+        forceOutage,
+        mismatchBias: params.mismatchBias ?? (forceOutage ? 0.25 : 0.1),
+      };
+    }
+    case "brownout": {
+      const reduction = Math.min(1, params.loadReduction ?? 0.5);
+      const variability = params.variability ?? 0.2;
+      const adjusted = baseLoadKw * Math.max(0, 1 - reduction) * (0.9 + Math.random() * variability);
+      return {
+        loadKw: Math.max(0, adjusted),
+        forceOutage: false,
+        mismatchBias: params.mismatchBias ?? 0.05,
+      };
+    }
+    case "cyberattack": {
+      const spikeMultiplier = params.spikeMultiplier ?? 1.6;
+      const jitter = params.jitter ?? 0.7;
+      const adjusted = baseLoadKw * spikeMultiplier * (0.8 + Math.random() * jitter);
+      return {
+        loadKw: Math.max(0, adjusted),
+        forceOutage: false,
+        mismatchBias: params.mismatchBias ?? 0.25,
+      };
+    }
+    case "custom":
+    default: {
+      const multiplier = params.loadMultiplier ?? 1;
+      const adjusted = baseLoadKw * multiplier;
+      return {
+        loadKw: Math.max(0, adjusted),
+        forceOutage: Boolean(params.forceOutage && params.forceOutage > 0),
+        mismatchBias: params.mismatchBias,
+      };
+    }
+  }
+}
+
+function mapDisasterStateToInfo(disaster: ArtificialDisasterState): ArtificialDisasterInfo {
+  return {
+    type: disaster.kind,
+    startedAt: new Date(disaster.startTime).toISOString(),
+    expiresAt: disaster.duration ? new Date(disaster.startTime + disaster.duration).toISOString() : undefined,
+    parameters: disaster.parameters,
+    notes: disaster.notes,
+  };
+}
+
+function findTransformerState(cityState: CityState, transformerId: string): TransformerState | null {
+  for (const ts of cityState.transformers.values()) {
+    if (ts.transformer.ID === transformerId) {
+      return ts;
+    }
+  }
+  return null;
 }
