@@ -7,7 +7,7 @@ GridPulse is a comprehensive energy monitoring and analytics platform for Meralc
 - **Multi-Level Dashboards**: Role-based dashboards for Meralco, Barangay, and Consumer users
 - **Interactive Maps**: Visualize transformers and households on interactive maps with real-time grid health indicators
 - **Analytics & Insights**: Track consumption trends, grid health metrics, and predictive insights
-- **Weather Integration**: Weather-based predictions for energy consumption patterns
+- **Real Weather Integration**: Live weather data from OpenWeatherMap API for accurate predictions
 - **Smart Meter Visualization**: Detailed consumption tracking for consumers
 - **Dark Mode Support**: Full dark mode support with theme switching
 - **Responsive Design**: Works seamlessly on desktop, tablet, and mobile devices
@@ -34,12 +34,20 @@ GridPulse is a comprehensive energy monitoring and analytics platform for Meralc
 npm install
 ```
 
-2. Run the development server:
+2. Set up environment variables:
+   - Copy `.env.local.example` or create `.env.local`
+   - Add your OpenWeatherMap API key (get free key at https://openweathermap.org/api)
+   ```
+   OPENWEATHER_API_KEY=your_api_key_here
+   JWT_SECRET=your-secret-key-here
+   ```
+
+3. Run the development server:
 ```bash
 npm run dev
 ```
 
-3. Open [http://localhost:3000](http://localhost:3000) in your browser
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
 
 ## Login Credentials
 

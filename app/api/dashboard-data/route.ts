@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     }
 
     try {
-      const data = getDashboardData(city);
+      const data = await getDashboardData(city);
       return NextResponse.json({ success: true, data });
     } catch (error) {
       console.error("Dashboard data error", error);

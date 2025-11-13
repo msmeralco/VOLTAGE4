@@ -27,6 +27,7 @@ import {
 } from "@/lib/bghi";
 import { EWMAForecaster } from "@/lib/forecasting";
 import { generateMockWeather, type WeatherData } from "@/lib/mock-data";
+import { fetchRealWeather } from "@/lib/weather-api";
 import { getSmartMeterReading } from "@/lib/smart-meter";
 import type {
   DashboardDataResponse,
@@ -470,10 +471,25 @@ function updateTransformerState(
   return { metrics: realtimeMetrics, alerts: overloadAlert ?? null };
 }
 
-export function getDashboardData(city: string): DashboardDataResponse {
+export async function getDashboardData(city: string): Promise<DashboardDataResponse> {
   const cityState = initializeCityState(city);
   const timestamp = new Date();
-  const weather = generateMockWeather(city);
+  
+  // Fetch real weather data
+  let weather: WeatherData;
+  try {
+    const realWeather = await fetchRealWeather(city);
+    weather = {
+      temperature: realWeather.temperature,
+      humidity: realWeather.humidity,
+      pressure: realWeather.pressure,
+      windSpeed: realWeather.windSpeed,
+      condition: realWeather.condition,
+    };
+  } catch (error) {
+    console.error('Failed to fetch real weather, using mock:', error);
+    weather = generateMockWeather(city);
+  }
 
   const transformerMetrics: TransformerRealtimeMetrics[] = [];
   const alerts: Array<{ transformerId: string; transformerName: string; alert: OverloadAlert }> = [];
