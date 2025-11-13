@@ -66,13 +66,20 @@ export default function LoginPage() {
       <nav className="w-full bg-[#fe5014] sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Zap className="h-8 w-8 text-white" />
+            <img
+              src="/icons/meralcolight.svg"
+              alt="Meralco logo"
+              className="w-40 h-20 text-[#fe5014]"
+            />
+            {/* <Zap className="h-8 w-8 text-white" /> */}
             {/* heading moved to footer per request */}
           </div>
-          <div className="flex items-center space-x-4">
-            <Link href="/back">
-              <Button className="bg-white text-[#fe5014] border-none hover:bg-gray-100">
-                Login
+          <div className="flex items-center space-x-4 pr-20">
+            <Link href="/">
+              <Button
+                className="bg-[#fe5014] hover:bg-white text-white border-[3px] hover:text-[#fe5014] border-white hover: rounded-full px-10 py-4 text-lg"
+              >
+                Back
               </Button>
             </Link>
           </div>
@@ -184,10 +191,17 @@ export default function LoginPage() {
 
       {/* Footer: GridPulse text moved here */}
       <footer className="w-full bg-white">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center">
+            <img
+              src="/icons/gridpulsedark.svg"
+              alt="Gridpulse Logo"
+              className="w-full max-w-[600px] h-auto object-contain py-10"
+            />
+          </div>
+        {/* <div className="container mx-auto px-4 py-6 flex items-center justify-center gap-3">
           <Zap className="h-6 w-6 text-[#fe5014]" />
           <span className="text-[#fe5014] font-semibold">GridPulse</span>
-        </div>
+        </div> */}
       </footer>
     </div>
   );
