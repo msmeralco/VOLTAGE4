@@ -4,6 +4,16 @@ import type { BGHIResult } from "@/lib/bghi";
 import type { ForecastPoint, OverloadAlert, PeakRiskInfo } from "@/lib/forecasting";
 import type { WeatherData } from "@/lib/mock-data";
 
+export type ArtificialDisasterKind = "heatwave" | "typhoon" | "earthquake" | "brownout" | "custom";
+
+export interface ArtificialDisasterInfo {
+  type: ArtificialDisasterKind;
+  startedAt: string;
+  expiresAt?: string;
+  parameters?: Record<string, number>;
+  notes?: string;
+}
+
 export interface HouseholdRealtime {
   id: string;
   transformerId: string;
@@ -34,6 +44,8 @@ export interface TransformerRealtimeMetrics {
   spikeEvents24h: number;
   mismatchRatio: number;
   lastUpdated: string;
+  artificialOutageActive?: boolean;
+  artificialDisaster?: ArtificialDisasterInfo | null;
 }
 
 export interface DashboardSummary {

@@ -39,6 +39,7 @@ function MapController({ center, zoom }: { center: [number, number]; zoom: numbe
 }
 
 function getLoadColor(loadPercentage: number): string {
+  if (loadPercentage <= 0) return "#6B7280";
   if (loadPercentage >= 95) return "#dc2626";
   if (loadPercentage >= 80) return "#f97316";
   if (loadPercentage >= 65) return "#facc15";

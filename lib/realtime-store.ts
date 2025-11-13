@@ -30,6 +30,8 @@ import { generateMockWeather, type WeatherData } from "@/lib/mock-data";
 import { fetchRealWeather } from "@/lib/weather-api";
 import { getSmartMeterReading } from "@/lib/smart-meter";
 import type {
+  ArtificialDisasterInfo,
+  ArtificialDisasterKind,
   DashboardDataResponse,
   DashboardSummary,
   HouseholdRealtime,

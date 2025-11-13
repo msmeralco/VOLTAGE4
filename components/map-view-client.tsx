@@ -59,7 +59,9 @@ export function MapViewComponent({
   const getTransformerIcon = (transformer: Transformer) => {
     const loadPercentage = (transformer.currentLoad / transformer.capacity) * 100;
     const color =
-      loadPercentage > 80
+      loadPercentage <= 0
+        ? "#6B7280"
+        : loadPercentage > 80
         ? "red"
         : loadPercentage > 60
         ? "orange"
