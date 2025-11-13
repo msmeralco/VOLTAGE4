@@ -5,9 +5,11 @@ import { DashboardLayout } from "@/components/dashboard-layout";
 import { CSVMapView } from "@/components/csv-map-view";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, Zap, Activity } from "lucide-react";
+import { AlertTriangle, Zap, Activity, FileDown } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, AreaChart, Area } from "recharts";
 import type { DashboardDataResponse, TransformerRealtimeMetrics } from "@/types/dashboard";
+import { Button } from "@/components/ui/button";
+import { generateBarangayReport } from "@/lib/pdf-export";
 
 const BARANGAY = "UP Diliman";
 
@@ -80,8 +82,22 @@ export default function BarangayDashboard() {
       <div className="space-y-6">
         <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Barangay Grid Health Index</CardTitle>
-            <CardDescription className="text-orange-100">Barangay {BARANGAY}</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-medium">Barangay Grid Health Index</CardTitle>
+                <CardDescription className="text-orange-100">Barangay {BARANGAY}</CardDescription>
+              </div>
+              {dashboardData && (
+                <Button
+                  onClick={() => generateBarangayReport(dashboardData, BARANGAY)}
+                  variant="secondary"
+                  size="sm"
+                >
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Export Report
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="flex items-end justify-between">
             <div>

@@ -13,9 +13,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, Zap, Cloud, Activity, TrendingUp, Waves, Wind } from "lucide-react";
+import { AlertTriangle, Zap, Cloud, Activity, TrendingUp, Waves, Wind, FileDown } from "lucide-react";
 import type { Transformer, Household, WeatherData } from "@/lib/mock-data";
 import { cities } from "@/lib/mock-data";
+import { Button } from "@/components/ui/button";
+import { generateGridHealthReport } from "@/lib/pdf-export";
 import { calculateGridHealth, generatePredictiveInsights } from "@/lib/mock-data";
 import {
   LineChart,
@@ -677,8 +679,21 @@ export default function MeralcoDashboard() {
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Select City</CardTitle>
-            <CardDescription>Choose a city to view grid data</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Select City</CardTitle>
+                <CardDescription>Choose a city to view grid data</CardDescription>
+              </div>
+              {dashboardData && isCSVMode && (
+                <Button
+                  onClick={() => generateGridHealthReport(dashboardData)}
+                  className="bg-orange-500 hover:bg-orange-600"
+                >
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Export Report
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <Select
