@@ -17,8 +17,7 @@ const BASE_URL = 'https://api.openweathermap.org/data/2.5/weather';
 // City coordinates for Philippines - FOCUSED ON QUEZON CITY
 const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
   'Quezon City': { lat: 14.6760, lon: 121.0437 },
-  'UP Diliman': { lat: 14.6549, lon: 121.0647 },
-  UPD: { lat: 14.6549, lon: 121.0647 },
+  'UP Diliman': { lat: 14.6519, lon: 121.0568 },
 };
 
 /**

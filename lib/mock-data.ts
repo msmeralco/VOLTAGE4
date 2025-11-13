@@ -213,27 +213,124 @@ export function calculateGridHealth(
 }
 
 // Generate predictive insights
-export function generatePredictiveInsights(
+/**
+ * Generate AI-powered predictive insights for a transformer
+ */
+export async function generatePredictiveInsights(
+  transformer: Transformer,
+  weather: WeatherData
+): Promise<string[]> {
+  try {
+    const loadPercentage = (transformer.currentLoad / transformer.capacity) * 100;
+    const thermalStress = loadPercentage > 80 ? 'HIGH' : loadPercentage > 70 ? 'MODERATE' : 'LOW';
+    const weatherImpact = weather.temperature > 32 ? 'SIGNIFICANT' : weather.temperature > 28 ? 'MODERATE' : 'MINIMAL';
+    
+    const prompt = `You are a senior electrical grid engineer with expertise in IEEE C57.91 transformer loading standards and Philippine grid operations.
+
+Transformer Technical Analysis:
+- Transformer ID: ${transformer.name}
+- Current Load: ${transformer.currentLoad.toFixed(1)} kW (${loadPercentage.toFixed(1)}% of ${transformer.capacity} kW capacity)
+- Thermal Stress Level: ${thermalStress}
+- Ambient Temperature: ${weather.temperature.toFixed(1)}°C (${weather.condition})
+- Humidity: ${weather.humidity}% 
+- Weather Impact Factor: ${weatherImpact}
+
+IEEE Standards Context:
+- IEEE C57.91: Normal loading = 0-80%, Emergency = 80-100%, Overload = >100%
+- IEEE C57.140: Temperature rise per 10°C ambient increase = ~7-10°C winding temp
+- ERC Standards: Philippine grid requires <5% voltage deviation, thermal trip at 150°C
+
+Task: Generate 2-4 HIGHLY SPECIFIC technical recommendations. Each must:
+1. Include exact numbers (kW, °C, %, hours, coordinates if applicable)
+2. Reference IEEE/ERC standards or technical principles
+3. Provide actionable steps with timing (e.g., "within 2 hours", "before 3 PM")
+4. Explain WHY based on physics/engineering (thermal aging, voltage drop, power factor)
+5. Be 15-25 words max per recommendation
+
+Example Format:
+["Redistribute 12.3 kW to adjacent transformers within 2h - IEEE C57.91 emergency loading at ${loadPercentage.toFixed(0)}% risks 15% lifespan reduction", "Install thermal monitoring - ambient ${weather.temperature.toFixed(0)}°C + 82% load = predicted 145°C winding temp (IEEE limit 150°C)"]
+
+Return ONLY a JSON array of strings. Be precise, technical, and reference standards.`;
+
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: prompt,
+        context: {},
+        conversationHistory: [],
+        language: 'english',
+      }),
+    });
+
+    const result = await response.json();
+    
+    if (result.success) {
+      // Try to parse JSON array from response
+      try {
+        const jsonMatch = result.response.match(/\[.*\]/s);
+        if (jsonMatch) {
+          const insights = JSON.parse(jsonMatch[0]);
+          if (Array.isArray(insights) && insights.length > 0) {
+            return insights.slice(0, 4); // Max 4 insights
+          }
+        }
+      } catch (parseError) {
+        // If JSON parsing fails, split by newlines/bullets
+        const lines = result.response
+          .split(/\n|•|\d+\./)
+          .map((s: string) => s.trim())
+          .filter((s: string) => s.length > 20 && s.length < 200);
+        
+        if (lines.length > 0) {
+          return lines.slice(0, 4);
+        }
+      }
+    }
+    
+    // Fallback to intelligent hardcoded insights
+    return generateFallbackInsights(transformer, weather);
+  } catch (error) {
+    console.error('Failed to generate AI insights:', error);
+    return generateFallbackInsights(transformer, weather);
+  }
+}
+
+/**
+ * Fallback insights when AI is unavailable
+ */
+function generateFallbackInsights(
   transformer: Transformer,
   weather: WeatherData
 ): string[] {
   const insights: string[] = [];
   const loadPercentage = (transformer.currentLoad / transformer.capacity) * 100;
+  const excessKw = transformer.currentLoad - (transformer.capacity * 0.8);
+  const tempRise = weather.temperature - 28; // Base ambient
+  const windingTemp = 100 + (loadPercentage * 0.5) + (tempRise * 8); // Simplified thermal model
 
-  if (loadPercentage > 75) {
-    insights.push(`Transformer ${transformer.name} load nearing 80% capacity`);
+  if (loadPercentage > 85) {
+    insights.push(`URGENT: ${transformer.name} at ${loadPercentage.toFixed(1)}% (IEEE C57.91 emergency) - redistribute ${excessKw.toFixed(1)} kW within 2h to prevent thermal trip`);
+  } else if (loadPercentage > 75) {
+    const hoursToLimit = ((100 - loadPercentage) / 5).toFixed(1); // Assume 5%/hr growth
+    insights.push(`WARNING: ${transformer.name} at ${loadPercentage.toFixed(1)}% - ${hoursToLimit}h until 100% capacity at current load growth rate`);
   }
 
-  if (weather.condition === "Rainy" || weather.condition === "Cloudy") {
-    insights.push("Lighting usage expected to increase by 5% this evening");
+  if (weather.temperature > 32 && loadPercentage > 70) {
+    insights.push(`Thermal stress: ${weather.temperature.toFixed(0)}°C ambient + ${loadPercentage.toFixed(0)}% load = ~${windingTemp.toFixed(0)}°C winding temp (IEEE limit 150°C) - monitor hourly`);
   }
 
-  if (transformer.currentLoad > transformer.capacity * 0.7) {
-    insights.push("Potential overload risk detected");
+  if (weather.condition === "Rainy" && loadPercentage > 60) {
+    insights.push(`Rainy conditions risk voltage fluctuations - install surge protection and monitor for ${(loadPercentage * 1.15).toFixed(0)}% transient peaks`);
   }
 
   if (loadPercentage < 30) {
-    insights.push("Suggested maintenance window: Low load period available");
+    const maintenanceWindow = loadPercentage < 20 ? '2-6 AM' : '3-5 AM';
+    insights.push(`Optimal maintenance window ${maintenanceWindow} - current ${loadPercentage.toFixed(0)}% load allows ${(transformer.capacity * 0.3).toFixed(0)} kW safety margin`);
+  }
+
+  if (insights.length === 0) {
+    insights.push(`${transformer.name} within IEEE normal loading (${loadPercentage.toFixed(1)}%) - continue routine monitoring per ERC standards`);
   }
 
   return insights;

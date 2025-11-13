@@ -127,8 +127,8 @@ export function CSVMapViewComponent({
                   pathOptions={{
                     color: "#111827",
                     weight: isSelected ? 4 : 2,
-                    fillColor: "transparent",
-                    fillOpacity: 0,
+                    fillColor: "#60A5FA",
+                    fillOpacity: 0.5,
                   }}
                 />
               </div>
@@ -167,10 +167,12 @@ export function CSVMapViewComponent({
               <Marker
                 position={[transformer.Latitude, transformer.Longitude]}
                 icon={createTransformerIcon(metric.loadPercentage, isSelected)}
-                eventHandlers={{
-                  click: () => onTransformerSelect?.(transformer.ID),
-                }}
-              >
+                // ensure transformer marker always appears above household markers
+                zIndexOffset={isSelected ? 2000 : 1500}
+                 eventHandlers={{
+                   click: () => onTransformerSelect?.(transformer.ID),
+                 }}
+               >
                 <Popup minWidth={280} maxWidth={320} className="text-xs">
                   <div className="space-y-2">
                     <div>
@@ -222,11 +224,13 @@ export function CSVMapViewComponent({
                   key={household.id}
                   position={[household.latitude, household.longitude]}
                   icon={L.icon({
-                    iconUrl: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHZpZXdCb3g9IjAgMCAxMiAxMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iNiIgY3k9IjYiIHI9IjMiIGZpbGw9IiM2QjcyODAiLz4KPC9zdmc+",
-                    iconSize: [10, 10],
-                    iconAnchor: [5, 5],
-                  })}
-                >
+                     iconUrl: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHZpZXdCb3g9IjAgMCAxMiAxMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iNiIgY3k9IjYiIHI9IjMiIGZpbGw9IiM2QjcyODAiLz4KPC9zdmc+",
+                     iconSize: [10, 10],
+                     iconAnchor: [5, 5],
+                   })}
+                  // keep household markers below transformers
+                  zIndexOffset={200}
+                 >
                   <Popup>
                     <div className="p-1 text-[11px]">
                       <p className="font-semibold">{household.id}</p>
