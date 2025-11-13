@@ -13,7 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Zap } from "lucide-react";
 import type { UserType } from "@/lib/mock-data";
 
@@ -42,10 +41,8 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (data.success) {
-        // Store token in cookie
         document.cookie = `auth-token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}`;
-        
-        // Redirect based on user type
+
         if (data.user.userType === "Meralco") {
           router.push("/dashboard/meralco");
         } else if (data.user.userType === "Barangay") {
@@ -64,73 +61,148 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex items-center justify-center mb-4">
-            <Zap className="h-10 w-10 text-orange-500" />
-            <span className="text-2xl font-bold ml-2 text-gray-900 dark:text-white">
-              GridPulse
-            </span>
+    <div className="min-h-screen flex flex-col bg-white">
+      {/* Navbar fixed to top */}
+      <nav className="w-full bg-[#fe5014] sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <img
+              src="/icons/meralcolight.svg"
+              alt="Meralco logo"
+              className="w-40 h-20 text-[#fe5014]"
+            />
+            {/* <Zap className="h-8 w-8 text-white" /> */}
+            {/* heading moved to footer per request */}
           </div>
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>
-            Enter your credentials to access your dashboard
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="userType">User Type</Label>
-              <Select value={userType} onValueChange={(value) => setUserType(value as UserType)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select user type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Meralco">Meralco</SelectItem>
-                  <SelectItem value="Barangay">Barangay</SelectItem>
-                  <SelectItem value="Consumer">Consumer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {error && (
-              <div className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md">
-                {error}
-              </div>
-            )}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Logging in..." : "Login"}
-            </Button>
-          </form>
-          <div className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
-            <Link href="/" className="hover:text-orange-500">
-              Back to home
+          <div className="flex items-center space-x-4 pr-20">
+            <Link href="/">
+              <Button
+                className="bg-[#fe5014] hover:bg-white text-white border-[3px] hover:text-[#fe5014] border-white hover: rounded-full px-10 py-4 text-lg"
+              >
+                Back
+              </Button>
             </Link>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </nav>
+
+      {/* Main area: ONLY login form and small links (no secondary assets here) */}
+      <main className="flex-1 w-full bg-[#fe5014] rounded-b-[100px] py-10">
+        <div className="container mx-auto px-4 py-6 flex flex-col items-center gap-8">
+          <div className="w-full max-w-md">
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor="email" className="text-white">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="bg-white text-[#fe5014] placeholder:text-[#fe5014]/70 shadow-inner focus:outline-none focus:ring-0 ring-0 border border-transparent"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="password" className="text-white">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="bg-white text-[#fe5014] placeholder:text-[#fe5014]/70 shadow-inner focus:outline-none focus:ring-0 ring-0 border border-transparent"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="userType" className="text-white">User Type</Label>
+                <Select
+                  value={userType}
+                  onValueChange={(value) => setUserType(value as UserType)}
+                >
+                  <SelectTrigger className="bg-white text-[#fe5014] placeholder:text-[#fe5014]/70 shadow-inner focus:outline-none focus:ring-0 ring-0 border border-transparent">
+                    <SelectValue placeholder="Select user type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Meralco">Meralco</SelectItem>
+                    <SelectItem value="Barangay">Barangay</SelectItem>
+                    <SelectItem value="Consumer">Consumer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {error && (
+                <div className="text-sm text-[#fe5014] bg-red-50 p-2 rounded-md">
+                  {error}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full bg-white hover:bg-white text-[#fe5014]"
+                disabled={loading}
+              >
+                {loading ? "Logging in..." : "Login"}
+              </Button>
+            </form>
+          </div>
+        </div>
+      </main>
+
+      {/* NEW: Secondary assets moved to their own full-width div under the login area */}
+      <div className="w-full bg-white py-8">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-4xl mx-auto grid md:grid-cols-3 gap-6">
+            <div className="p-4">
+              <div className="flex items-center gap-3">
+                <Zap className="h-7 w-7 text-[#fe5014]" />
+                <h3 className="text-md font-semibold text-[#fe5014]">Real-time Grid</h3>
+              </div>
+              <p className="text-sm text-[#fe5014]/90 mt-2">
+                Visualize grid health and transformer loads with live updates.
+              </p>
+            </div>
+
+            <div className="p-4">
+              <div className="flex items-center gap-3">
+                <Zap className="h-7 w-7 text-[#fe5014]" />
+                <h3 className="text-md font-semibold text-[#fe5014]">Analytics</h3>
+              </div>
+              <p className="text-sm text-[#fe5014]/90 mt-2">
+                Track consumption trends and predictive insights for better planning.
+              </p>
+            </div>
+
+            <div className="p-4">
+              <div className="flex items-center gap-3">
+                <Zap className="h-7 w-7 text-[#fe5014]" />
+                <h3 className="text-md font-semibold text-[#fe5014]">Access Control</h3>
+              </div>
+              <p className="text-sm text-[#fe5014]/90 mt-2">
+                Role-based dashboards for Meralco, Barangay officials, and consumers.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer: GridPulse text moved here */}
+      <footer className="w-full bg-white">
+        <div className="flex items-center justify-center">
+            <img
+              src="/icons/gridpulsedark.svg"
+              alt="Gridpulse Logo"
+              className="w-full max-w-[600px] h-auto object-contain py-10"
+            />
+          </div>
+        {/* <div className="container mx-auto px-4 py-6 flex items-center justify-center gap-3">
+          <Zap className="h-6 w-6 text-[#fe5014]" />
+          <span className="text-[#fe5014] font-semibold">GridPulse</span>
+        </div> */}
+      </footer>
     </div>
   );
 }

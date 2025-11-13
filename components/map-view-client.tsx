@@ -89,7 +89,7 @@ export function MapViewComponent({
   };
 
   return (
-    <div className="w-full h-[600px] rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="w-full h-[600px] rounded-lg border border-[#fe5014]-200 overflow-hidden">
       <MapContainer
         center={center}
         zoom={13}
