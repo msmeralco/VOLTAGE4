@@ -3,7 +3,7 @@ import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, LogOut, Bell, AlertTriangle } from "lucide-react";
+import { Bell, AlertTriangle } from "lucide-react";
 import { useTheme } from "next-themes";
 import {
   DropdownMenu,
@@ -63,7 +63,7 @@ export function DashboardLayout({ role, children, title, warnings = [] }: Dashbo
             {/* heading moved to footer per request */}
           </div>
 
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-4 pr-20">
             {/* Notifications Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -136,7 +136,7 @@ export function DashboardLayout({ role, children, title, warnings = [] }: Dashbo
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Theme Toggle */}
+            {/* Theme Toggle
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="text-white">
@@ -148,12 +148,11 @@ export function DashboardLayout({ role, children, title, warnings = [] }: Dashbo
                 <DropdownMenuItem onClick={() => setTheme("dark")}>Dark</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setTheme("system")}>System</DropdownMenuItem>
               </DropdownMenuContent>
-            </DropdownMenu>
+            </DropdownMenu> */}
 
             {/* Logout */}
-            <Button variant="outline" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
+            <Button variant="outline" className="border-[3px] border-white bg-[#ff7a1a] text-white  hover:text-white hover:border-white hover: rounded-full px-10 py-5 text-lg" onClick={handleLogout}>
+              Exit
             </Button>
           </div>
         </div>

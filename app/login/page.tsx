@@ -63,13 +63,13 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col bg-white">
       {/* Navbar fixed to top */}
-      <nav className="w-full bg-[#fe5014] sticky top-0 z-50">
+      <nav className="w-full bg-[#ff7a1a] sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <img
               src="/icons/meralcolight.svg"
               alt="Meralco logo"
-              className="w-40 h-20 text-[#fe5014]"
+              className="w-40 h-20 text-[#ff7a1a]"
             />
             {/* <Zap className="h-8 w-8 text-white" /> */}
             {/* heading moved to footer per request */}
@@ -77,7 +77,7 @@ export default function LoginPage() {
           <div className="flex items-center space-x-4 pr-20">
             <Link href="/">
               <Button
-                className="bg-[#fe5014] hover:bg-white text-white border-[3px] hover:text-[#fe5014] border-white hover: rounded-full px-10 py-4 text-lg"
+                className="bg-[#ff7a1a] hover:bg-white text-white border-[3px] hover:text-[#ff7a1a] border-white hover: rounded-full px-10 py-5 text-lg"
               >
                 Back
               </Button>
@@ -87,7 +87,7 @@ export default function LoginPage() {
       </nav>
 
       {/* Main area: ONLY login form and small links (no secondary assets here) */}
-      <main className="flex-1 w-full bg-[#fe5014] rounded-b-[100px] py-10">
+      <main className="flex-1 w-full bg-[#ff7a1a] rounded-b-[100px] py-10">
         <div className="container mx-auto px-4 py-6 flex flex-col items-center gap-8">
           <div className="w-full max-w-md">
             <form onSubmit={handleSubmit} className="space-y-3">
@@ -100,7 +100,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="bg-white text-[#fe5014] placeholder:text-[#fe5014]/70 shadow-inner focus:outline-none focus:ring-0 ring-0 border border-transparent"
+                  className="bg-white text-[#ff7a1a] placeholder:text-[#ff7a1a]/70 shadow-inner focus:outline-none focus:ring-0 ring-0 border border-transparent"
                 />
               </div>
 
@@ -113,7 +113,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="bg-white text-[#fe5014] placeholder:text-[#fe5014]/70 shadow-inner focus:outline-none focus:ring-0 ring-0 border border-transparent"
+                  className="bg-white text-[#ff7a1a] placeholder:text-[#ff7a1a]/70 shadow-inner focus:outline-none focus:ring-0 ring-0 border border-transparent"
                 />
               </div>
 
@@ -123,7 +123,7 @@ export default function LoginPage() {
                   value={userType}
                   onValueChange={(value) => setUserType(value as UserType)}
                 >
-                  <SelectTrigger className="bg-white text-[#fe5014] placeholder:text-[#fe5014]/70 shadow-inner focus:outline-none focus:ring-0 ring-0 border border-transparent">
+                  <SelectTrigger className="bg-white text-[#ff7a1a] placeholder:text-[#ff7a1a]/70 shadow-inner focus:outline-none focus:ring-0 ring-0 border border-transparent">
                     <SelectValue placeholder="Select user type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -135,14 +135,14 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="text-sm text-[#fe5014] bg-red-50 p-2 rounded-md">
+                <div className="text-sm text-[#ff7a1a] bg-red-50 p-2 rounded-md">
                   {error}
                 </div>
               )}
 
               <Button
                 type="submit"
-                className="w-full bg-white hover:bg-white text-[#fe5014]"
+                className="w-full bg-white hover:bg-white text-[#ff7a1a]"
                 disabled={loading}
               >
                 {loading ? "Logging in..." : "Login"}
@@ -158,30 +158,30 @@ export default function LoginPage() {
           <div className="max-w-4xl mx-auto grid md:grid-cols-3 gap-6">
             <div className="p-4">
               <div className="flex items-center gap-3">
-                <Zap className="h-7 w-7 text-[#fe5014]" />
-                <h3 className="text-md font-semibold text-[#fe5014]">Real-time Grid</h3>
+                <Zap className="h-7 w-7 text-[#ff7a1a]" />
+                <h3 className="text-md font-semibold text-[#ff7a1a]">Real-time Grid</h3>
               </div>
-              <p className="text-sm text-[#fe5014]/90 mt-2">
+              <p className="text-sm text-[#ff7a1a]/90 mt-2">
                 Visualize grid health and transformer loads with live updates.
               </p>
             </div>
 
             <div className="p-4">
               <div className="flex items-center gap-3">
-                <Zap className="h-7 w-7 text-[#fe5014]" />
-                <h3 className="text-md font-semibold text-[#fe5014]">Analytics</h3>
+                <Zap className="h-7 w-7 text-[#ff7a1a]" />
+                <h3 className="text-md font-semibold text-[#ff7a1a]">Analytics</h3>
               </div>
-              <p className="text-sm text-[#fe5014]/90 mt-2">
+              <p className="text-sm text-[#ff7a1a]/90 mt-2">
                 Track consumption trends and predictive insights for better planning.
               </p>
             </div>
 
             <div className="p-4">
               <div className="flex items-center gap-3">
-                <Zap className="h-7 w-7 text-[#fe5014]" />
-                <h3 className="text-md font-semibold text-[#fe5014]">Access Control</h3>
+                <Zap className="h-7 w-7 text-[#ff7a1a]" />
+                <h3 className="text-md font-semibold text-[#ff7a1a]">Access Control</h3>
               </div>
-              <p className="text-sm text-[#fe5014]/90 mt-2">
+              <p className="text-sm text-[#ff7a1a]/90 mt-2">
                 Role-based dashboards for Meralco, Barangay officials, and consumers.
               </p>
             </div>
@@ -199,8 +199,8 @@ export default function LoginPage() {
             />
           </div>
         {/* <div className="container mx-auto px-4 py-6 flex items-center justify-center gap-3">
-          <Zap className="h-6 w-6 text-[#fe5014]" />
-          <span className="text-[#fe5014] font-semibold">GridPulse</span>
+          <Zap className="h-6 w-6 text-[#ff7a1a]" />
+          <span className="text-[#ff7a1a] font-semibold">GridPulse</span>
         </div> */}
       </footer>
     </div>
