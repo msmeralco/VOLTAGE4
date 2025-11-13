@@ -277,7 +277,7 @@ export default function MeralcoDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">BGHI Score</CardTitle>
+            <CardTitle className="text-sm font-medium">City Grid Health Index</CardTitle>
             <CardDescription className="text-orange-100">Meralco - {dashboardData.city}</CardDescription>
           </CardHeader>
           <CardContent className="flex items-end justify-between">
