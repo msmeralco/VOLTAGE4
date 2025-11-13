@@ -129,8 +129,11 @@ export default function MeralcoDashboard() {
   }));
 
   return (
-    <DashboardLayout title="Meralco Dashboard">
-      <div className="space-y-6">
+    <DashboardLayout title="">
+      <div
+        className="space-y-6 min-h-screen"
+        style={{ backgroundColor: "#fe5014", color: "#ffffff" }}
+      >
         {/* City Selector */}
         <Card>
           <CardHeader>
@@ -164,7 +167,7 @@ export default function MeralcoDashboard() {
           <CardContent>
             {loading ? (
               <div className="h-[600px] flex items-center justify-center">
-                <p className="text-gray-500">Loading map data...</p>
+                <p className="text-white">Loading map data...</p>
               </div>
             ) : isCSVMode ? (
               <CSVMapView
@@ -200,22 +203,22 @@ export default function MeralcoDashboard() {
               {currentTransformer ? (
                 <div className="space-y-4">
                   <div>
-                    <p className="text-sm text-gray-500">Transformer ID</p>
+                    <p className="text-sm text-white/90">Transformer ID</p>
                     <p className="text-xl font-bold">
                       {isCSVMode 
                         ? (currentTransformer as TransformerWithLoad).ID
                         : (currentTransformer as Transformer).name}
                     </p>
-                    <p className="text-sm text-gray-500 mt-2">Type</p>
+                    <p className="text-sm text-white/90 mt-2">Type</p>
                     <p className="text-lg font-semibold">
                       {isCSVMode 
                         ? (currentTransformer as TransformerWithLoad).EntityType
                         : "Transformer"}
                     </p>
                   </div>
-                  
+
                   <div>
-                    <p className="text-sm text-gray-500">Total Load</p>
+                    <p className="text-sm text-white/90">Total Load</p>
                     <p className="text-2xl font-bold">
                       {isCSVMode
                         ? (currentTransformer as TransformerWithLoad).totalLoad.toFixed(2)
@@ -223,12 +226,12 @@ export default function MeralcoDashboard() {
                     </p>
                     {!isCSVMode && (
                       <>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-white/90">
                           Capacity: {(currentTransformer as Transformer).capacity} kW
                         </p>
-                        <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
+                        <div className="mt-2 w-full bg-white/20 rounded-full h-2.5">
                           <div
-                            className="bg-orange-500 h-2.5 rounded-full"
+                            className="bg-white h-2.5 rounded-full"
                             style={{
                               width: `${((currentTransformer as Transformer).currentLoad / (currentTransformer as Transformer).capacity) * 100}%`,
                             }}
@@ -240,12 +243,12 @@ export default function MeralcoDashboard() {
 
                   {isCSVMode && (
                     <div>
-                      <p className="text-sm text-gray-500">Downstream Buildings</p>
+                      <p className="text-sm text-white/90">Downstream Buildings</p>
                       <p className="text-xl font-bold">
                         {(currentTransformer as TransformerWithLoad).NumDownstreamBuildings}
                       </p>
                       {(currentTransformer as TransformerWithLoad).ParentID && (
-                        <p className="text-sm text-gray-500 mt-2">
+                        <p className="text-sm text-white/90 mt-2">
                           Parent: {(currentTransformer as TransformerWithLoad).ParentID}
                         </p>
                       )}
@@ -257,24 +260,24 @@ export default function MeralcoDashboard() {
                       <p className="text-sm font-semibold">Weather Parameters</p>
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div>
-                          <Cloud className="h-4 w-4 inline mr-1" />
-                          <span className="text-gray-500">Temperature: </span>
+                          <Cloud className="h-4 w-4 inline mr-1 text-white" />
+                          <span className="text-white/90">Temperature: </span>
                           <span className="font-semibold">{weather.temperature.toFixed(1)}°C</span>
                         </div>
                         <div>
-                          <span className="text-gray-500">Humidity: </span>
+                          <span className="text-white/90">Humidity: </span>
                           <span className="font-semibold">{weather.humidity.toFixed(1)}%</span>
                         </div>
                         <div>
-                          <span className="text-gray-500">Pressure: </span>
+                          <span className="text-white/90">Pressure: </span>
                           <span className="font-semibold">{weather.pressure.toFixed(1)} hPa</span>
                         </div>
                         <div>
-                          <span className="text-gray-500">Wind: </span>
+                          <span className="text-white/90">Wind: </span>
                           <span className="font-semibold">{weather.windSpeed.toFixed(1)} m/s</span>
                         </div>
                         <div className="col-span-2">
-                          <span className="text-gray-500">Condition: </span>
+                          <span className="text-white/90">Condition: </span>
                           <span className="font-semibold">{weather.condition}</span>
                         </div>
                       </div>
@@ -283,11 +286,11 @@ export default function MeralcoDashboard() {
 
                   {gridHealth !== null && (
                     <div>
-                      <p className="text-sm text-gray-500">Grid Health</p>
+                      <p className="text-sm text-white/90">Grid Health</p>
                       <p className="text-2xl font-bold">
                         {gridHealth.toFixed(1)}%
                       </p>
-                      <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
+                      <div className="mt-2 w-full bg-white/20 rounded-full h-2.5">
                         <div
                           className={`h-2.5 rounded-full ${
                             gridHealth > 70
@@ -303,7 +306,7 @@ export default function MeralcoDashboard() {
                   )}
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-8">
+                <p className="text-white/90 text-center py-8">
                   Click on a transformer marker to view details
                 </p>
               )}
@@ -322,15 +325,15 @@ export default function MeralcoDashboard() {
                   {insights.map((insight, index) => (
                     <div
                       key={index}
-                      className="flex items-start space-x-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800"
+                      className="flex items-start space-x-3 p-3 bg-white/10 rounded-lg border border-white/10"
                     >
-                      <AlertTriangle className="h-5 w-5 text-orange-500 mt-0.5" />
-                      <p className="text-sm text-gray-700 dark:text-gray-300">{insight}</p>
+                      <AlertTriangle className="h-5 w-5 text-white mt-0.5" />
+                      <p className="text-sm">{insight}</p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-8">
+                <p className="text-white/90 text-center py-8">
                   Select a transformer to see predictive insights
                 </p>
               )}
@@ -358,9 +361,9 @@ export default function MeralcoDashboard() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="load" fill="#f97316" name="Total Load (kW)" />
+                    <Bar dataKey="load" fill="#ffffff" name="Total Load (kW)" />
                     {!isCSVMode && (
-                      <Bar dataKey="capacity" fill="#e5e7eb" name="Capacity (kW)" />
+                      <Bar dataKey="capacity" fill="#fde3d2" name="Capacity (kW)" />
                     )}
                     {isCSVMode && (
                       <Bar dataKey="buildings" fill="#93c5fd" name="Buildings" />
@@ -379,7 +382,7 @@ export default function MeralcoDashboard() {
                     <Line
                       type="monotone"
                       dataKey="load"
-                      stroke="#f97316"
+                      stroke="#ffffff"
                       strokeWidth={2}
                       name="Load (kW)"
                     />
