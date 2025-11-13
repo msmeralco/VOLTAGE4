@@ -552,14 +552,19 @@ export default function ConsumerDashboard() {
                     <LineChart data={smartMeterData?.daily || []}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis
-                        dataKey="date"
+                        dataKey="hour"
                         angle={-45}
                         textAnchor="end"
                         height={100}
-                        tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                        tick={{ fontSize: 11 }}
                       />
-                      <YAxis />
-                      <Tooltip labelFormatter={(value) => new Date(value).toLocaleDateString()} />
+                      <YAxis 
+                        label={{ value: 'Consumption (kWh)', angle: -90, position: 'insideLeft', style: { fontSize: 12 } }}
+                      />
+                      <Tooltip 
+                        labelFormatter={(value) => `Hour: ${value}`}
+                        formatter={(value: number) => [`${value.toFixed(2)} kWh`, 'Consumption']}
+                      />
                       <Legend />
                       <Line
                         type="monotone"
@@ -575,9 +580,13 @@ export default function ConsumerDashboard() {
                   <ResponsiveContainer width="100%" height={400}>
                     <BarChart data={smartMeterData?.weekly || []}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="week" />
-                      <YAxis />
-                      <Tooltip />
+                      <XAxis dataKey="day" />
+                      <YAxis 
+                        label={{ value: 'Consumption (kWh)', angle: -90, position: 'insideLeft', style: { fontSize: 12 } }}
+                      />
+                      <Tooltip 
+                        formatter={(value: number) => [`${value.toFixed(2)} kWh`, 'Consumption']}
+                      />
                       <Legend />
                       <Bar dataKey="consumption" fill="#f97316" name="Consumption (kWh)" />
                     </BarChart>
