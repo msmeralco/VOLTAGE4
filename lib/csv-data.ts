@@ -1,5 +1,7 @@
 // CSV data types and utilities
 
+import { getSmartMeterReading } from "@/lib/smart-meter";
+
 export interface CSVTransformer {
   EntityType: "SubstationTransformer" | "PolePadTransformer";
   ID: string;
@@ -22,11 +24,10 @@ export interface Household {
   load: number; // kW
 }
 
-// Smart meter function - placeholder for actual implementation
+// Smart meter function now generates realistic loads based on the SmartMeter simulation
 export function smartMeter(buildingID: string): number {
-  // Placeholder until actual logic is implemented
-  // Returns load in kW
-  return Math.random() * 5 + 1; // 1-6 kW per building
+  const reading = getSmartMeterReading(buildingID);
+  return reading.loadKw;
 }
 
 // Generate random household coordinates around a transformer

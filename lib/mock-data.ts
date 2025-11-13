@@ -76,15 +76,11 @@ export const mockUsers: User[] = [
 ];
 
 // Mock cities
-export const cities = ["Manila", "Quezon City", "Makati", "Pasig", "Taguig"];
+export const cities = ["Quezon City"];
 
 // Mock barangays per city
 export const barangaysByCity: Record<string, string[]> = {
-  Manila: ["Barangay 1", "Barangay 2", "Barangay 3"],
   "Quezon City": ["Barangay A", "Barangay B", "Barangay C"],
-  Makati: ["Barangay X", "Barangay Y", "Barangay Z"],
-  Pasig: ["Barangay Alpha", "Barangay Beta"],
-  Taguig: ["Barangay North", "Barangay South"],
 };
 
 // Generate mock transformers
