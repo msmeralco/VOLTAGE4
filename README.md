@@ -2,9 +2,9 @@
 
 GridPulse is a comprehensive energy monitoring and analytics platform for Meralco, Barangay administrators, and consumers. It provides real-time grid health monitoring, transformer load analytics, weather-based predictive insights, and smart meter data visualization.
 
-## Barangay Grid Health Index (BGHI)
+## Grid Health Index (BGHI)
 
-The **BGHI** is a composite metric (0-100 scale) that evaluates the overall health of a barangay's electrical grid infrastructure. Unlike simple averages, BGHI uses a **weighted aggregate approach** that accounts for both the severity of issues and the number of households affected.
+The **GHI** is a composite metric (0-100 scale) that evaluates the overall health of a barangay's electrical grid infrastructure. Unlike simple averages, BGHI uses a **weighted aggregate approach** that accounts for both the severity of issues and the number of households affected.
 
 ### How BGHI Works
 
