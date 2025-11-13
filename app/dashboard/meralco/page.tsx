@@ -715,14 +715,22 @@ export default function MeralcoDashboard() {
   );
 
   return (
-    <DashboardLayout 
-      title="Meralco Dashboard"
+    <DashboardLayout
+      role="meralco" 
+      title=""
       warnings={
         dashboardData?.transformers
           .flatMap((metric) => metric.recentAnomalies)
           .slice(0, 20) || []
       }
     >
+      {/* <div className="flex items-center justify-center py-5 bg-[#ff7a1a]">
+            <img
+              src="/icons/citywatch.svg"
+              alt="Gridpulse Logo"
+              className="w-full max-w-[600px] h-auto object-contain py-10"
+            />
+          </div> */}
       <div className="space-y-6">
         <Card>
           <CardHeader>

@@ -84,7 +84,7 @@ export default function ConsumerDashboard() {
     : 0;
 
   return (
-    <DashboardLayout title="Consumer Dashboard">
+    <DashboardLayout role="consumer" title="Consumer Dashboard">
       <div className="space-y-6">
         <div className="grid md:grid-cols-4 gap-6">
           <Card>

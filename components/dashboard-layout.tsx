@@ -15,14 +15,28 @@ import {
 import type { Anomaly } from "@/lib/anomaly";
 
 interface DashboardLayoutProps {
+  role: "meralco" | "barangay" | "consumer";
   children: React.ReactNode;
   title: string;
   warnings?: Anomaly[];
 }
 
-export function DashboardLayout({ children, title, warnings = [] }: DashboardLayoutProps) {
+export function DashboardLayout({ role, children, title, warnings = [] }: DashboardLayoutProps) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+
+  const getBannerSrc = (role: "meralco" | "barangay" | "consumer") => {
+    switch (role) {
+      case "meralco":
+        return "/icons/citywatch.svg";
+      case "barangay":
+        return "/icons/barangaywatch.svg";
+      case "consumer":
+        return "/icons/bahaywatch.svg";
+      default:
+        return "/icons/citywatch.svg";
+    }
+  };
 
   const handleLogout = () => {
     document.cookie = "auth-token=; path=/; max-age=0";
@@ -35,14 +49,11 @@ export function DashboardLayout({ children, title, warnings = [] }: DashboardLay
     .slice(-10); // Show last 10 warnings
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#fe5014]">
+    <div className="min-h-screen flex flex-col bg-[#ff7a1a]">
       {/* Top bar */}
-      <header className="w-full bg-[#fe5014] sticky top-0 z-40">
+      <header className="w-full bg-[#ff7a1a] sticky top-0 z-40">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <Link href="/" className="text-2xl font-bold text-white">
-              GridPulse
-            </Link>
           </div>
 
           <div className="hidden md:flex items-center space-x-4">
@@ -142,7 +153,14 @@ export function DashboardLayout({ children, title, warnings = [] }: DashboardLay
       </header>
 
       {/* Main content */}
-      <main className="flex-1">
+      <main className="flex-1 bg-white">
+        <div className ="flex justify-center bg-[#ff7a1a] pb-5 rounded-b-[100px]">
+        <img
+                src={getBannerSrc(role)}
+                alt="Gridpulse Logo"
+                className="w-full max-w-[600px] h-auto object-contain"
+              />
+    </div>
         {title && (
           <div className="container mx-auto px-4 py-4">
             <h1 className="text-xl font-semibold text-gray-900">{title}</h1>

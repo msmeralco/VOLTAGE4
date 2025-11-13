@@ -115,6 +115,7 @@ export default function BarangayDashboard() {
 
   return (
     <DashboardLayout 
+      role="barangay"
       title="Barangay Dashboard" 
       warnings={allWarnings.map((w) => w.anomaly)}
     >
