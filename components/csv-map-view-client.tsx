@@ -127,8 +127,8 @@ export function CSVMapViewComponent({
                   pathOptions={{
                     color: "#111827",
                     weight: isSelected ? 4 : 2,
-                    fillColor: "#60A5FA",
-                    fillOpacity: 0.5,
+                    fillColor: "#facc15",
+                    fillOpacity: 1,
                   }}
                 />
               </div>

@@ -158,7 +158,7 @@ export default function BarangayDashboard() {
   role="barangay"
   title="Barangay Dashboard"
   warnings={allWarnings}
-/>
+>
       <div className="space-y-6 pt-6">
         <Card className="bg-gradient-to-br from-[#ff7a1a] to-orange-500 text-white">
           <CardHeader className="pb-2">
