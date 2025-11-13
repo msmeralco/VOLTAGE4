@@ -1045,11 +1045,7 @@ export default function MeralcoDashboard() {
     <DashboardLayout
       role="meralco" 
       title=""
-      warnings={
-        dashboardData?.transformers
-          .flatMap((metric) => metric.recentAnomalies)
-          .slice(0, 20) || []
-      }
+      warnings={notificationAlerts}
     >
       {/* <div className="flex items-center justify-center py-5 bg-[#ff7a1a]">
             <img
