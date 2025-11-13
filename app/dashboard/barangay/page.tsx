@@ -166,7 +166,7 @@ export default function BarangayDashboard() {
             <CardTitle>Barangay Grid Map</CardTitle>
             <CardDescription>Transformers and connected households within {BARANGAY}</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="relative z-0">
             {isLoading || !dashboardData ? (
               <div className="h-[600px] flex items-center justify-center">
                 <p className="text-gray-500">Loading barangay data...</p>

@@ -655,7 +655,7 @@ export default function MeralcoDashboard() {
           <CardTitle>Grid Map</CardTitle>
           <CardDescription>Real-time visibility of Quezon City transformers and households</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="relative z-0">
           {isLoadingRealtime || !dashboardData ? (
             <div className="h-[600px] flex items-center justify-center">
               <p className="text-gray-500">Loading live metrics...</p>
