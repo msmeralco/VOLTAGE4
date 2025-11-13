@@ -6,11 +6,12 @@ import { CSVMapView } from "@/components/csv-map-view";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, Zap, Activity, FileDown } from "lucide-react";
-import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, AreaChart, Area } from "recharts";
+import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, AreaChart, Area, LineChart, Line, Legend, ReferenceLine } from "recharts";
 import type { DashboardDataResponse, TransformerRealtimeMetrics } from "@/types/dashboard";
 import { Button } from "@/components/ui/button";
 import { generateBarangayReport } from "@/lib/pdf-export";
 import { generatePredictiveInsights } from "@/lib/mock-data";
+import { getBGHITrends, type HistoricalBGHI } from "@/lib/historical-data";
 
 const BARANGAY = "UP Diliman";
 
@@ -19,6 +20,10 @@ export default function BarangayDashboard() {
   const [selectedTransformerId, setSelectedTransformerId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState<number>(15);
+  const [insights, setInsights] = useState<string[]>([]);
+  const [isLoadingInsights, setIsLoadingInsights] = useState(false);
+  const [historicalData, setHistoricalData] = useState<HistoricalBGHI[]>([]);
+  const [historicalPeriod, setHistoricalPeriod] = useState<7 | 30>(30);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
@@ -60,20 +65,53 @@ export default function BarangayDashboard() {
     return dashboardData.transformers.find((item) => item.transformer.ID === selectedTransformerId);
   }, [dashboardData, selectedTransformerId]);
 
-  const barangayInsights = useMemo(() => {
-    if (!selectedTransformer || !dashboardData) return [];
+  // Load historical BGHI trends
+  useEffect(() => {
+    if (dashboardData) {
+      const avgLoad = dashboardData.transformers.reduce((sum, t) => sum + t.currentLoadKw, 0) / dashboardData.transformers.length;
+      const history = getBGHITrends(
+        dashboardData.city,
+        dashboardData.summary.bghiScore,
+        avgLoad,
+        dashboardData.anomalies.length,
+        dashboardData.summary.criticalTransformers,
+        historicalPeriod
+      );
+      setHistoricalData(history);
+    }
+  }, [dashboardData, historicalPeriod]);
 
-    const capacityEstimate = selectedTransformer.loadPercentage > 0
-      ? (selectedTransformer.currentLoadKw * 100) / selectedTransformer.loadPercentage
-      : (selectedTransformer.transformer.totalLoad ?? selectedTransformer.currentLoadKw * 2);
+  // Load AI insights asynchronously
+  useEffect(() => {
+    async function loadInsights() {
+      if (!selectedTransformer || !dashboardData) {
+        setInsights([]);
+        return;
+      }
 
-    const transformerLike = {
-      name: selectedTransformer.transformer.ID,
-      currentLoad: selectedTransformer.currentLoadKw,
-      capacity: capacityEstimate,
-    } as any;
+      const capacityEstimate = selectedTransformer.loadPercentage > 0
+        ? (selectedTransformer.currentLoadKw * 100) / selectedTransformer.loadPercentage
+        : (selectedTransformer.transformer.totalLoad ?? selectedTransformer.currentLoadKw * 2);
 
-    return generatePredictiveInsights(transformerLike, dashboardData.weather);
+      const transformerLike = {
+        name: selectedTransformer.transformer.ID,
+        currentLoad: selectedTransformer.currentLoadKw,
+        capacity: capacityEstimate,
+      } as any;
+
+      setIsLoadingInsights(true);
+      try {
+        const result = await generatePredictiveInsights(transformerLike, dashboardData.weather);
+        setInsights(result);
+      } catch (error) {
+        console.error('Failed to load insights:', error);
+        setInsights(['Failed to load recommendations']);
+      } finally {
+        setIsLoadingInsights(false);
+      }
+    }
+    
+    loadInsights();
   }, [selectedTransformer, dashboardData]);
 
   const loadData = useMemo(() => {
@@ -95,8 +133,6 @@ export default function BarangayDashboard() {
     ...point,
     label: `+${point.offsetHours}h`,
   })) ?? [];
-
-  console.log("🔍 Summary data:", summary);
 
   // Collect all warnings from anomalies
   const allWarnings = useMemo(() => {
@@ -129,7 +165,13 @@ export default function BarangayDashboard() {
               </div>
               {dashboardData && (
                 <Button
-                  onClick={() => generateBarangayReport(dashboardData, BARANGAY)}
+                  onClick={async () => {
+                    try {
+                      await generateBarangayReport(dashboardData, BARANGAY);
+                    } catch (error) {
+                      console.error('Failed to generate report:', error);
+                    }
+                  }}
                   variant="secondary"
                   size="sm"
                 >
@@ -158,6 +200,103 @@ export default function BarangayDashboard() {
               </div>
               <Activity className="h-10 w-10 text-white/80" />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Historical BGHI Trends */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>BGHI Trends</CardTitle>
+                <CardDescription>Grid health history for {BARANGAY}</CardDescription>
+              </div>
+              <Tabs value={historicalPeriod.toString()} onValueChange={(v) => setHistoricalPeriod(parseInt(v) as 7 | 30)}>
+                <TabsList>
+                  <TabsTrigger value="7">Last 7 Days</TabsTrigger>
+                  <TabsTrigger value="30">Last 30 Days</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {historicalData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={historicalData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis 
+                    dataKey="date" 
+                    tickFormatter={(date) => {
+                      const d = new Date(date);
+                      return historicalPeriod === 7 
+                        ? d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                        : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    }}
+                    tick={{ fontSize: 11 }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis 
+                    domain={[0, 100]} 
+                    tick={{ fontSize: 11 }}
+                    label={{ value: 'BGHI Score', angle: -90, position: 'insideLeft', style: { fontSize: 12 } }}
+                  />
+                  <Tooltip 
+                    labelFormatter={(date) => new Date(date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    formatter={(value: number, name: string) => {
+                      if (name === 'bghiScore') return [value.toFixed(1), 'BGHI Score'];
+                      return [value, name];
+                    }}
+                    contentStyle={{ fontSize: 12 }}
+                  />
+                  <Legend />
+                  
+                  {/* Reference lines for thresholds */}
+                  <ReferenceLine y={80} stroke="#22c55e" strokeDasharray="3 3" label={{ value: 'Good', position: 'right', fontSize: 10, fill: '#22c55e' }} />
+                  <ReferenceLine y={60} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: 'Warning', position: 'right', fontSize: 10, fill: '#f59e0b' }} />
+                  
+                  {/* Main BGHI line */}
+                  <Line 
+                    type="monotone" 
+                    dataKey="bghiScore" 
+                    stroke="#f97316" 
+                    strokeWidth={3}
+                    dot={{ fill: '#f97316', r: 3 }}
+                    activeDot={{ r: 6 }}
+                    name="BGHI Score"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[280px] flex items-center justify-center">
+                <p className="text-gray-500">Loading historical data...</p>
+              </div>
+            )}
+            
+            {/* Summary stats */}
+            {historicalData.length > 0 && (
+              <div className="mt-4 grid grid-cols-3 gap-3 text-center text-xs border-t pt-4">
+                <div>
+                  <p className="text-gray-500">Average BGHI</p>
+                  <p className="font-bold text-lg mt-1">
+                    {(historicalData.reduce((sum, d) => sum + d.bghiScore, 0) / historicalData.length).toFixed(1)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Best Day</p>
+                  <p className="font-bold text-lg mt-1 text-green-600">
+                    {Math.max(...historicalData.map(d => d.bghiScore)).toFixed(1)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Worst Day</p>
+                  <p className="font-bold text-lg mt-1 text-red-600">
+                    {Math.min(...historicalData.map(d => d.bghiScore)).toFixed(1)}
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -190,9 +329,9 @@ export default function BarangayDashboard() {
             {(!dashboardData || !selectedTransformer) ? (
               <p className="text-gray-500 text-center py-8">Select a transformer to see predictive insights</p>
             ) : (
-              barangayInsights.length > 0 ? (
+              insights.length > 0 ? (
                 <div className="space-y-3">
-                  {barangayInsights.map((insight, idx) => (
+                  {insights.map((insight, idx) => (
                     <div key={idx} className="flex items-start space-x-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
                       <AlertTriangle className="h-5 w-5 text-orange-500 mt-0.5" />
                       <p className="text-sm text-gray-700 dark:text-gray-300">{insight}</p>
