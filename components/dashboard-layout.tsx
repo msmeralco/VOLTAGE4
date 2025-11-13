@@ -53,7 +53,14 @@ export function DashboardLayout({ role, children, title, warnings = [] }: Dashbo
       {/* Top bar */}
       <header className="w-full bg-[#ff7a1a] sticky top-0 z-40">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2">
+            <img
+              src="/icons/meralcolight.svg"
+              alt="Meralco logo"
+              className="w-40 h-20 text-[#ff7a1a]"
+            />
+            {/* <Zap className="h-8 w-8 text-white" /> */}
+            {/* heading moved to footer per request */}
           </div>
 
           <div className="hidden md:flex items-center space-x-4">
@@ -154,11 +161,11 @@ export function DashboardLayout({ role, children, title, warnings = [] }: Dashbo
 
       {/* Main content */}
       <main className="flex-1 bg-white">
-        <div className ="flex justify-center bg-[#ff7a1a] pb-5 rounded-b-[100px]">
+        <div className ="flex justify-center bg-[#ff7a1a] pb-10 rounded-b-[100px]">
         <img
                 src={getBannerSrc(role)}
                 alt="Gridpulse Logo"
-                className="w-full max-w-[600px] h-auto object-contain"
+                className="w-full max-w-[400px] h-auto object-contain"
               />
     </div>
         {title && (

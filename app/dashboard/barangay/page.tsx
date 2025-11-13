@@ -116,16 +116,16 @@ export default function BarangayDashboard() {
   return (
     <DashboardLayout 
       role="barangay"
-      title="Barangay Dashboard" 
+      title="" 
       warnings={allWarnings.map((w) => w.anomaly)}
     >
-      <div className="space-y-6">
-        <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
+      <div className="space-y-6 pt-6">
+        <Card className="bg-gradient-to-br from-[#ff7a1a] to-orange-500 text-white">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-medium">Barangay Grid Health Index</CardTitle>
-                <CardDescription className="text-orange-100">Barangay {BARANGAY}</CardDescription>
+                <CardDescription className="text-white">Barangay {BARANGAY}</CardDescription>
               </div>
               {dashboardData && (
                 <Button

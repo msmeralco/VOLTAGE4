@@ -731,10 +731,10 @@ export default function MeralcoDashboard() {
               className="w-full max-w-[600px] h-auto object-contain py-10"
             />
           </div> */}
-      <div className="space-y-6">
+      <div className="space-y-6 pt-6">
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between pt-1">
               <div>
                 <CardTitle>Select City</CardTitle>
                 <CardDescription>Choose a city to view grid data</CardDescription>
@@ -742,7 +742,7 @@ export default function MeralcoDashboard() {
               {dashboardData && isCSVMode && (
                 <Button
                   onClick={() => generateGridHealthReport(dashboardData)}
-                  className="bg-orange-500 hover:bg-orange-600"
+                  className="bg-[#ff7a1a] hover:bg-orange-500"
                 >
                   <FileDown className="mr-2 h-4 w-4" />
                   Export Report
