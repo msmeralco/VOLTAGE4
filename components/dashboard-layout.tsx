@@ -67,7 +67,7 @@ export function DashboardLayout({ role, children, title, warnings = [] }: Dashbo
             {/* Notifications Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative text-white">
+                <Button variant="ghost" size="icon" className="relative text-white rounded-full">
                   <Bell className="h-5 w-5" />
                   {recentWarnings.length > 0 && (
                     <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
@@ -151,7 +151,7 @@ export function DashboardLayout({ role, children, title, warnings = [] }: Dashbo
             </DropdownMenu> */}
 
             {/* Logout */}
-            <Button variant="outline" className="border-[3px] border-white bg-[#ff7a1a] text-white  hover:text-white hover:border-white hover: rounded-full px-10 py-5 text-lg" onClick={handleLogout}>
+            <Button variant="outline" className="border-[3px] border-white bg-[#ff7a1a] text-white  hover:text-[#ff7a1a] hover:border-white hover: rounded-full px-10 py-5 text-lg" onClick={handleLogout}>
               Exit
             </Button>
           </div>
