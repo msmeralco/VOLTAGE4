@@ -2,50 +2,35 @@
 
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
-import { MapView } from "@/components/map-view";
+import { CSVMapView } from "@/components/csv-map-view";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, Zap, Cloud } from "lucide-react";
-import type { Transformer, Household, WeatherData } from "@/lib/mock-data";
-import { calculateGridHealth, generatePredictiveInsights, barangaysByCity } from "@/lib/mock-data";
+import type { TransformerWithLoad, Household as CSVHousehold } from "@/lib/csv-data";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 export default function BarangayDashboard() {
-  const [transformers, setTransformers] = useState<Transformer[]>([]);
-  const [households, setHouseholds] = useState<Household[]>([]);
-  const [selectedTransformer, setSelectedTransformer] = useState<Transformer | null>(null);
-  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [transformers, setTransformers] = useState<TransformerWithLoad[]>([]);
+  const [households, setHouseholds] = useState<CSVHousehold[]>([]);
+  const [selectedTransformer, setSelectedTransformer] = useState<TransformerWithLoad | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // Mock barangay data - in real app, this would come from auth
-  const barangay = "Barangay 1";
-  const city = "Manila";
+  // Barangay data - UP Diliman
+  const barangay = "UP Diliman";
+  const city = "UP Diliman";
 
   useEffect(() => {
     fetchBarangayData();
-    fetchWeather();
   }, []);
 
   const fetchBarangayData = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/transformers?city=${city}&barangay=${barangay}`);
+      const response = await fetch(`/api/csv-transformers?city=${city}`);
       const result = await response.json();
       if (result.success) {
-        setTransformers(result.data);
-        // Generate households for these transformers
-        const allHouseholds: Household[] = [];
-        result.data.forEach((transformer: Transformer) => {
-          for (let i = 0; i < transformer.households.length; i++) {
-            allHouseholds.push({
-              id: transformer.households[i],
-              transformerId: transformer.id,
-              latitude: transformer.latitude + (Math.random() - 0.5) * 0.01,
-              longitude: transformer.longitude + (Math.random() - 0.5) * 0.01,
-            });
-          }
-        });
-        setHouseholds(allHouseholds);
+        setTransformers(result.data.transformers);
+        setHouseholds(result.data.households);
       }
     } catch (error) {
       console.error("Error fetching barangay data:", error);
@@ -54,38 +39,13 @@ export default function BarangayDashboard() {
     }
   };
 
-  const fetchWeather = async () => {
-    try {
-      const response = await fetch(`/api/weather?city=${city}`);
-      const result = await response.json();
-      if (result.success) {
-        setWeather(result.data);
-      }
-    } catch (error) {
-      console.error("Error fetching weather:", error);
-    }
-  };
-
-  const gridHealth = selectedTransformer && weather
-    ? calculateGridHealth(
-        selectedTransformer.currentLoad,
-        selectedTransformer.capacity,
-        weather.temperature,
-        weather.humidity,
-        weather.pressure
-      )
-    : null;
-
-  const insights = selectedTransformer && weather
-    ? generatePredictiveInsights(selectedTransformer, weather)
-    : [];
-
-  const loadData = transformers.map((t) => ({
-    name: t.name,
-    load: t.currentLoad,
-    capacity: t.capacity,
-    percentage: (t.currentLoad / t.capacity) * 100,
-  }));
+  const loadData = transformers
+    .filter((t) => t.EntityType === "PolePadTransformer")
+    .map((t) => ({
+      name: t.ID,
+      load: t.totalLoad,
+      buildings: t.NumDownstreamBuildings,
+    }));
 
   return (
     <DashboardLayout title="Barangay Dashboard">
@@ -112,7 +72,7 @@ export default function BarangayDashboard() {
                 <p className="text-gray-500">Loading map data...</p>
               </div>
             ) : (
-              <MapView
+              <CSVMapView
                 transformers={transformers}
                 households={households}
                 selectedTransformer={selectedTransformer}
@@ -130,7 +90,7 @@ export default function BarangayDashboard() {
               <CardTitle>Transformer Details</CardTitle>
               <CardDescription>
                 {selectedTransformer
-                  ? `Information for ${selectedTransformer.name}`
+                  ? `Information for ${selectedTransformer.ID}`
                   : "Select a transformer on the map to view details"}
               </CardDescription>
             </CardHeader>
@@ -138,64 +98,30 @@ export default function BarangayDashboard() {
               {selectedTransformer ? (
                 <div className="space-y-4">
                   <div>
-                    <p className="text-sm text-gray-500">Current Load</p>
+                    <p className="text-sm text-gray-500">Transformer ID</p>
+                    <p className="text-xl font-bold">{selectedTransformer.ID}</p>
+                    <p className="text-sm text-gray-500 mt-2">Type</p>
+                    <p className="text-lg font-semibold">{selectedTransformer.EntityType}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-gray-500">Total Load</p>
                     <p className="text-2xl font-bold">
-                      {selectedTransformer.currentLoad.toFixed(1)} kW
+                      {selectedTransformer.totalLoad.toFixed(2)} kW
                     </p>
-                    <p className="text-sm text-gray-500">
-                      Capacity: {selectedTransformer.capacity} kW
-                    </p>
-                    <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
-                      <div
-                        className="bg-orange-500 h-2.5 rounded-full"
-                        style={{
-                          width: `${(selectedTransformer.currentLoad / selectedTransformer.capacity) * 100}%`,
-                        }}
-                      />
-                    </div>
                   </div>
 
-                  {weather && (
-                    <div className="space-y-2">
-                      <p className="text-sm font-semibold">Weather Parameters</p>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <Cloud className="h-4 w-4 inline mr-1" />
-                          <span className="text-gray-500">Temperature: </span>
-                          <span className="font-semibold">{weather.temperature.toFixed(1)}°C</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Humidity: </span>
-                          <span className="font-semibold">{weather.humidity.toFixed(1)}%</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Condition: </span>
-                          <span className="font-semibold">{weather.condition}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {gridHealth !== null && (
-                    <div>
-                      <p className="text-sm text-gray-500">Grid Health</p>
-                      <p className="text-2xl font-bold">
-                        {gridHealth.toFixed(1)}%
+                  <div>
+                    <p className="text-sm text-gray-500">Downstream Buildings</p>
+                    <p className="text-xl font-bold">
+                      {selectedTransformer.NumDownstreamBuildings}
+                    </p>
+                    {selectedTransformer.ParentID && (
+                      <p className="text-sm text-gray-500 mt-2">
+                        Parent: {selectedTransformer.ParentID}
                       </p>
-                      <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
-                        <div
-                          className={`h-2.5 rounded-full ${
-                            gridHealth > 70
-                              ? "bg-green-500"
-                              : gridHealth > 40
-                              ? "bg-yellow-500"
-                              : "bg-red-500"
-                          }`}
-                          style={{ width: `${gridHealth}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               ) : (
                 <p className="text-gray-500 text-center py-8">
@@ -205,30 +131,31 @@ export default function BarangayDashboard() {
             </CardContent>
           </Card>
 
-          {/* Predictive Insights */}
+          {/* Transformer Summary */}
           <Card>
             <CardHeader>
-              <CardTitle>Predictive Insights</CardTitle>
-              <CardDescription>AI-powered predictions for your barangay</CardDescription>
+              <CardTitle>Barangay Summary</CardTitle>
+              <CardDescription>Overview of {barangay} grid</CardDescription>
             </CardHeader>
             <CardContent>
-              {insights.length > 0 ? (
-                <div className="space-y-3">
-                  {insights.map((insight, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start space-x-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800"
-                    >
-                      <AlertTriangle className="h-5 w-5 text-orange-500 mt-0.5" />
-                      <p className="text-sm text-gray-700 dark:text-gray-300">{insight}</p>
-                    </div>
-                  ))}
+              <div className="space-y-3">
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                    Total Transformers: {transformers.length}
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                    {transformers.filter((t) => t.EntityType === "SubstationTransformer").length} Substations
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400">
+                    {transformers.filter((t) => t.EntityType === "PolePadTransformer").length} Pole Pad Transformers
+                  </p>
                 </div>
-              ) : (
-                <p className="text-gray-500 text-center py-8">
-                  Select a transformer to see predictive insights
-                </p>
-              )}
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <p className="text-sm font-semibold text-green-700 dark:text-green-300">
+                    Total Load: {transformers.reduce((sum, t) => sum + t.totalLoad, 0).toFixed(2)} kW
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -247,8 +174,8 @@ export default function BarangayDashboard() {
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="load" fill="#f97316" name="Current Load (kW)" />
-                <Bar dataKey="capacity" fill="#e5e7eb" name="Capacity (kW)" />
+                    <Bar dataKey="load" fill="#f97316" name="Total Load (kW)" />
+                    <Bar dataKey="buildings" fill="#93c5fd" name="Buildings" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

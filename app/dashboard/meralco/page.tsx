@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { MapView } from "@/components/map-view";
+import { CSVMapView } from "@/components/csv-map-view";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -14,22 +15,33 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, TrendingUp, Zap, Cloud } from "lucide-react";
 import type { Transformer, Household, WeatherData } from "@/lib/mock-data";
+import type { TransformerWithLoad, Household as CSVHousehold } from "@/lib/csv-data";
 import { cities } from "@/lib/mock-data";
 import { calculateGridHealth, generatePredictiveInsights } from "@/lib/mock-data";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from "recharts";
 
+const allCities = [...cities, "Quezon City"];
+
 export default function MeralcoDashboard() {
-  const [selectedCity, setSelectedCity] = useState<string>("Manila");
+  const [selectedCity, setSelectedCity] = useState<string>("Quezon City");
   const [transformers, setTransformers] = useState<Transformer[]>([]);
   const [households, setHouseholds] = useState<Household[]>([]);
+  const [csvTransformers, setCsvTransformers] = useState<TransformerWithLoad[]>([]);
+  const [csvHouseholds, setCsvHouseholds] = useState<CSVHousehold[]>([]);
   const [selectedTransformer, setSelectedTransformer] = useState<Transformer | null>(null);
+  const [selectedCSVTransformer, setSelectedCSVTransformer] = useState<TransformerWithLoad | null>(null);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
+  const isCSVMode = selectedCity === "Quezon City";
 
   useEffect(() => {
-    fetchGridData();
+    if (isCSVMode) {
+      fetchCSVData();
+    } else {
+      fetchGridData();
+    }
     fetchWeather();
-  }, [selectedCity]);
+  }, [selectedCity, isCSVMode]);
 
   const fetchGridData = async () => {
     setLoading(true);
@@ -39,9 +51,29 @@ export default function MeralcoDashboard() {
       if (result.success) {
         setTransformers(result.data.transformers);
         setHouseholds(result.data.households);
+        setCsvTransformers([]);
+        setCsvHouseholds([]);
       }
     } catch (error) {
       console.error("Error fetching grid data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCSVData = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/csv-transformers?city=${selectedCity}`);
+      const result = await response.json();
+      if (result.success) {
+        setCsvTransformers(result.data.transformers);
+        setCsvHouseholds(result.data.households);
+        setTransformers([]);
+        setHouseholds([]);
+      }
+    } catch (error) {
+      console.error("Error fetching CSV data:", error);
     } finally {
       setLoading(false);
     }
@@ -59,27 +91,37 @@ export default function MeralcoDashboard() {
     }
   };
 
-  const gridHealth = selectedTransformer && weather
+  const currentTransformer = isCSVMode ? selectedCSVTransformer : selectedTransformer;
+  
+  const gridHealth = currentTransformer && weather && !isCSVMode
     ? calculateGridHealth(
-        selectedTransformer.currentLoad,
-        selectedTransformer.capacity,
+        (currentTransformer as Transformer).currentLoad,
+        (currentTransformer as Transformer).capacity,
         weather.temperature,
         weather.humidity,
         weather.pressure
       )
     : null;
 
-  const insights = selectedTransformer && weather
-    ? generatePredictiveInsights(selectedTransformer, weather)
+  const insights = currentTransformer && weather && !isCSVMode
+    ? generatePredictiveInsights(currentTransformer as Transformer, weather)
     : [];
 
   // Prepare chart data
-  const loadData = transformers.map((t) => ({
-    name: t.name.split(" - ")[1] || t.name,
-    load: t.currentLoad,
-    capacity: t.capacity,
-    percentage: (t.currentLoad / t.capacity) * 100,
-  }));
+  const loadData = isCSVMode
+    ? csvTransformers
+        .filter((t) => t.EntityType === "PolePadTransformer")
+        .map((t) => ({
+          name: t.ID,
+          load: t.totalLoad,
+          buildings: t.NumDownstreamBuildings,
+        }))
+    : transformers.map((t) => ({
+        name: t.name.split(" - ")[1] || t.name,
+        load: t.currentLoad,
+        capacity: t.capacity,
+        percentage: (t.currentLoad / t.capacity) * 100,
+      }));
 
   const timeSeriesData = Array.from({ length: 24 }, (_, i) => ({
     hour: `${i}:00`,
@@ -101,7 +143,7 @@ export default function MeralcoDashboard() {
                 <SelectValue placeholder="Select a city" />
               </SelectTrigger>
               <SelectContent>
-                {cities.map((city) => (
+                {allCities.map((city) => (
                   <SelectItem key={city} value={city}>
                     {city}
                   </SelectItem>
@@ -124,6 +166,13 @@ export default function MeralcoDashboard() {
               <div className="h-[600px] flex items-center justify-center">
                 <p className="text-gray-500">Loading map data...</p>
               </div>
+            ) : isCSVMode ? (
+              <CSVMapView
+                transformers={csvTransformers}
+                households={csvHouseholds}
+                selectedTransformer={selectedCSVTransformer}
+                onTransformerSelect={setSelectedCSVTransformer}
+              />
             ) : (
               <MapView
                 transformers={transformers}
@@ -148,25 +197,60 @@ export default function MeralcoDashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {selectedTransformer ? (
+              {currentTransformer ? (
                 <div className="space-y-4">
                   <div>
-                    <p className="text-sm text-gray-500">Current Load</p>
-                    <p className="text-2xl font-bold">
-                      {selectedTransformer.currentLoad.toFixed(1)} kW
+                    <p className="text-sm text-gray-500">Transformer ID</p>
+                    <p className="text-xl font-bold">
+                      {isCSVMode 
+                        ? (currentTransformer as TransformerWithLoad).ID
+                        : (currentTransformer as Transformer).name}
                     </p>
-                    <p className="text-sm text-gray-500">
-                      Capacity: {selectedTransformer.capacity} kW
+                    <p className="text-sm text-gray-500 mt-2">Type</p>
+                    <p className="text-lg font-semibold">
+                      {isCSVMode 
+                        ? (currentTransformer as TransformerWithLoad).EntityType
+                        : "Transformer"}
                     </p>
-                    <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
-                      <div
-                        className="bg-orange-500 h-2.5 rounded-full"
-                        style={{
-                          width: `${(selectedTransformer.currentLoad / selectedTransformer.capacity) * 100}%`,
-                        }}
-                      />
-                    </div>
                   </div>
+                  
+                  <div>
+                    <p className="text-sm text-gray-500">Total Load</p>
+                    <p className="text-2xl font-bold">
+                      {isCSVMode
+                        ? (currentTransformer as TransformerWithLoad).totalLoad.toFixed(2)
+                        : (currentTransformer as Transformer).currentLoad.toFixed(1)} kW
+                    </p>
+                    {!isCSVMode && (
+                      <>
+                        <p className="text-sm text-gray-500">
+                          Capacity: {(currentTransformer as Transformer).capacity} kW
+                        </p>
+                        <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
+                          <div
+                            className="bg-orange-500 h-2.5 rounded-full"
+                            style={{
+                              width: `${((currentTransformer as Transformer).currentLoad / (currentTransformer as Transformer).capacity) * 100}%`,
+                            }}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {isCSVMode && (
+                    <div>
+                      <p className="text-sm text-gray-500">Downstream Buildings</p>
+                      <p className="text-xl font-bold">
+                        {(currentTransformer as TransformerWithLoad).NumDownstreamBuildings}
+                      </p>
+                      {(currentTransformer as TransformerWithLoad).ParentID && (
+                        <p className="text-sm text-gray-500 mt-2">
+                          Parent: {(currentTransformer as TransformerWithLoad).ParentID}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {weather && (
                     <div className="space-y-2">
@@ -274,8 +358,13 @@ export default function MeralcoDashboard() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="load" fill="#f97316" name="Current Load (kW)" />
-                    <Bar dataKey="capacity" fill="#e5e7eb" name="Capacity (kW)" />
+                    <Bar dataKey="load" fill="#f97316" name="Total Load (kW)" />
+                    {!isCSVMode && (
+                      <Bar dataKey="capacity" fill="#e5e7eb" name="Capacity (kW)" />
+                    )}
+                    {isCSVMode && (
+                      <Bar dataKey="buildings" fill="#93c5fd" name="Buildings" />
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </TabsContent>
