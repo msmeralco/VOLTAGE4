@@ -46,9 +46,10 @@ function roundTo(value: number, decimalPlaces: number): number {
   return Math.round(value * factor) / factor;
 }
 
-function truncateToMinute(date: Date): Date {
+function truncateToInterval(date: Date, intervalSeconds: number): Date {
   const truncated = new Date(date);
-  truncated.setSeconds(0, 0);
+  const ms = intervalSeconds * 1000;
+  truncated.setTime(Math.floor(truncated.getTime() / ms) * ms);
   return truncated;
 }
 
@@ -89,7 +90,7 @@ export class SmartMeter {
 
   generateLoads(
     numMinutes = 24 * 60,
-    startTime: Date = truncateToMinute(new Date()),
+    startTime: Date = truncateToInterval(new Date(), 60),
     externalTempSeries?: number[]
   ): SmartMeterReading[] {
     const readings: SmartMeterReading[] = [];
@@ -146,18 +147,27 @@ export class SmartMeter {
     return this.loadCache.get(this.cacheKey(timestamp)) ?? 0;
   }
 
-  generateInstantaneousLoad(timestamp: Date = truncateToMinute(new Date())): SmartMeterReading {
-    const existing = this.loadCache.get(this.cacheKey(timestamp));
+  generateInstantaneousLoad(
+    timestamp: Date = new Date(),
+    cacheIntervalSeconds = 30
+  ): SmartMeterReading {
+    const bucketedTimestamp = truncateToInterval(timestamp, cacheIntervalSeconds);
+    const cacheKey = this.cacheKey(bucketedTimestamp);
+    const existing = this.loadCache.get(cacheKey);
     if (existing !== undefined) {
       return {
-        timestamp,
+        timestamp: bucketedTimestamp,
         meterId: this.meterId,
         loadKw: existing,
       };
     }
 
-    const [reading] = this.generateLoads(1, timestamp);
-    return reading;
+    const [reading] = this.generateLoads(1, truncateToInterval(timestamp, 60));
+    this.loadCache.set(cacheKey, reading.loadKw);
+    return {
+      ...reading,
+      timestamp: bucketedTimestamp,
+    };
   }
 }
 
@@ -170,4 +180,37 @@ export function createSmartMeter(
     ...options,
     baseKw,
   });
+}
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __SMART_METERS__: Map<string, SmartMeter> | undefined;
+}
+
+function getSmartMeterStore(): Map<string, SmartMeter> {
+  if (!globalThis.__SMART_METERS__) {
+    globalThis.__SMART_METERS__ = new Map();
+  }
+  return globalThis.__SMART_METERS__;
+}
+
+export function getOrCreateSmartMeter(meterId: string): SmartMeter {
+  const store = getSmartMeterStore();
+  if (!store.has(meterId)) {
+    store.set(meterId, createSmartMeter(meterId));
+  }
+  return store.get(meterId)!;
+}
+
+export function getSmartMeterReading(
+  meterId: string,
+  timestamp: Date = new Date(),
+  cacheIntervalSeconds = 30
+): SmartMeterReading {
+  const meter = getOrCreateSmartMeter(meterId);
+  return meter.generateInstantaneousLoad(timestamp, cacheIntervalSeconds);
+}
+
+export function resetSmartMeterCache() {
+  globalThis.__SMART_METERS__ = new Map();
 }

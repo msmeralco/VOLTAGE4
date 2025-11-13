@@ -1,0 +1,492 @@
+import { readFileSync } from "fs";
+import { join } from "path";
+import Papa from "papaparse";
+
+import {
+  type CSVTransformer,
+  type TransformerWithLoad,
+  processCSVData,
+} from "@/lib/csv-data";
+import {
+  RollingWindowStats,
+  SpikeDetector,
+  SustainedOverdrawDetector,
+  OutageDetector,
+  MismatchDetector,
+  pruneOldAnomalies,
+  type Anomaly,
+} from "@/lib/anomaly";
+import {
+  computeLoadStress,
+  computeOutageScore,
+  computePowerQualityScore,
+  computeAnomalyFrequencyScore,
+  computeEnvironmentalStressScore,
+  computeMismatchScore,
+  calculateBGHI,
+} from "@/lib/bghi";
+import { EWMAForecaster } from "@/lib/forecasting";
+import { generateMockWeather, type WeatherData } from "@/lib/mock-data";
+import { getSmartMeterReading } from "@/lib/smart-meter";
+import type {
+  DashboardDataResponse,
+  DashboardSummary,
+  HouseholdRealtime,
+  TransformerRealtimeMetrics,
+} from "@/types/dashboard";
+import type { OverloadAlert } from "@/lib/forecasting";
+
+interface HouseholdState {
+  id: string;
+  transformerId: string;
+  latitude: number;
+  longitude: number;
+  loadHistory: Array<{ timestamp: number; loadKw: number }>;
+  latestLoadKw: number;
+}
+
+interface TransformerDetectors {
+  spike: SpikeDetector;
+  overdraw: SustainedOverdrawDetector;
+  outage: OutageDetector;
+  mismatch: MismatchDetector;
+}
+
+interface TransformerState {
+  transformer: TransformerWithLoad;
+  householdIds: string[];
+  rollingStats: RollingWindowStats;
+  detectors: TransformerDetectors;
+  history: Array<{ timestamp: number; loadKw: number }>;
+  anomalies: Anomaly[];
+  spikeEvents: number[];
+  outageFlags: Array<{ timestamp: number; isOutage: boolean }>;
+  mismatchRatios: Array<{ timestamp: number; ratio: number }>;
+  forecaster: EWMAForecaster;
+  capacityKw: number;
+  lastUpdated: number;
+}
+
+interface CityState {
+  transformers: Map<string, TransformerState>;
+  households: Map<string, HouseholdState>;
+  lastUpdated: number;
+}
+
+interface RealtimeStore {
+  cities: Map<string, CityState>;
+}
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __REALTIME_STORE__: RealtimeStore | undefined;
+  // eslint-disable-next-line no-var
+  var __CITY_CSV_CACHE__: Map<string, CSVTransformer[]> | undefined;
+}
+
+const REFRESH_INTERVAL_SECONDS = 30;
+const MAX_HISTORY_MS = 24 * 60 * 60 * 1000; // 24h
+const CITY_FILE_MAP: Record<string, string> = {
+  "Quezon City": "mock_meralco_transformers_QC.csv",
+  QC: "mock_meralco_transformers_QC.csv",
+  "UP Diliman": "mock_meralco_transformers_UPDiliman.csv",
+  UPD: "mock_meralco_transformers_UPDiliman.csv",
+};
+
+function getRealtimeStore(): RealtimeStore {
+  if (!globalThis.__REALTIME_STORE__) {
+    globalThis.__REALTIME_STORE__ = {
+      cities: new Map(),
+    };
+  }
+  return globalThis.__REALTIME_STORE__;
+}
+
+function getCsvCache(): Map<string, CSVTransformer[]> {
+  if (!globalThis.__CITY_CSV_CACHE__) {
+    globalThis.__CITY_CSV_CACHE__ = new Map();
+  }
+  return globalThis.__CITY_CSV_CACHE__;
+}
+
+function loadCsvTransformers(city: string): CSVTransformer[] {
+  const cache = getCsvCache();
+  if (cache.has(city)) {
+    return cache.get(city)!;
+  }
+
+  const fileName = CITY_FILE_MAP[city];
+  if (!fileName) {
+    throw new Error(`Unsupported city: ${city}`);
+  }
+
+  const csvPath = join(process.cwd(), "public", fileName);
+  const csvText = readFileSync(csvPath, "utf-8");
+  const parsed = Papa.parse<CSVTransformer>(csvText, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: (header) => {
+      const headerMap: Record<string, string> = {
+        entitytype: "EntityType",
+        id: "ID",
+        parentid: "ParentID",
+        latitude: "Latitude",
+        longitude: "Longitude",
+        numdownstreambuildings: "NumDownstreamBuildings",
+      };
+      return headerMap[header.toLowerCase()] || header;
+    },
+    transform: (value, field) => {
+      if (field === "Latitude" || field === "Longitude") {
+        return parseFloat(value) || 0;
+      }
+      if (field === "NumDownstreamBuildings") {
+        return parseInt(value, 10) || 0;
+      }
+      return value;
+    },
+  });
+
+  if (parsed.errors.length) {
+    throw new Error(`Failed to parse CSV for ${city}: ${parsed.errors[0].message}`);
+  }
+
+  cache.set(city, parsed.data);
+  return parsed.data;
+}
+
+function initializeCityState(city: string): CityState {
+  const store = getRealtimeStore();
+  if (store.cities.has(city)) {
+    return store.cities.get(city)!;
+  }
+
+  const csvTransformers = loadCsvTransformers(city);
+  const { transformers, households } = processCSVData(csvTransformers);
+
+  const householdMap = new Map<string, HouseholdState>();
+  const transformerMap = new Map<string, TransformerState>();
+
+  const timestamp = Date.now();
+
+  transformers.forEach((transformer) => {
+    const householdStates = transformer.households.map((household) => {
+      const state: HouseholdState = {
+        id: household.id,
+        transformerId: household.transformerId,
+        latitude: household.latitude,
+        longitude: household.longitude,
+        latestLoadKw: household.load,
+        loadHistory: [{ timestamp, loadKw: household.load }],
+      };
+      householdMap.set(household.id, state);
+      return state.id;
+    });
+
+    const capacityKw = Math.max(100, transformer.NumDownstreamBuildings * 5);
+
+    const transformerState: TransformerState = {
+      transformer,
+      householdIds: householdStates,
+      rollingStats: new RollingWindowStats(120),
+      detectors: {
+        spike: new SpikeDetector(),
+        overdraw: new SustainedOverdrawDetector(),
+        outage: new OutageDetector(),
+        mismatch: new MismatchDetector(),
+      },
+      history: [{ timestamp, loadKw: transformer.totalLoad }],
+      anomalies: [],
+      spikeEvents: [],
+      outageFlags: [{ timestamp, isOutage: transformer.totalLoad < 0.1 }],
+      mismatchRatios: [],
+      forecaster: (() => {
+        const forecaster = new EWMAForecaster(0.5);
+        const baseLoad = capacityKw * 0.4;
+        const peakLoad = capacityKw * 0.85;
+        forecaster.generateBaselineFromPattern({ baseLoad, peakLoad });
+        return forecaster;
+      })(),
+      capacityKw,
+      lastUpdated: timestamp,
+    };
+
+    transformerState.rollingStats.add(transformer.totalLoad, new Date(timestamp));
+    transformerMap.set(transformer.ID, transformerState);
+  });
+
+  const cityState: CityState = {
+    transformers: transformerMap,
+    households: householdMap,
+    lastUpdated: timestamp,
+  };
+
+  store.cities.set(city, cityState);
+  return cityState;
+}
+
+function pruneHistory<T extends { timestamp: number }>(items: T[]): T[] {
+  const cutoff = Date.now() - MAX_HISTORY_MS;
+  return items.filter((item) => item.timestamp >= cutoff);
+}
+
+function computeRollingMean(history: Array<{ timestamp: number; loadKw: number }>, durationMinutes: number): number {
+  if (!history.length) return 0;
+  const cutoff = Date.now() - durationMinutes * 60 * 1000;
+  const samples = history.filter((item) => item.timestamp >= cutoff);
+  if (!samples.length) return history[history.length - 1].loadKw;
+  const sum = samples.reduce((acc, item) => acc + item.loadKw, 0);
+  return sum / samples.length;
+}
+
+function computeHourlyBaseline(history: Array<{ timestamp: number; loadKw: number }>): number {
+  if (!history.length) return 0;
+  const currentHour = new Date().getHours();
+  const sameHourSamples = history.filter((item) => new Date(item.timestamp).getHours() === currentHour);
+  if (!sameHourSamples.length) {
+    return history[history.length - 1].loadKw;
+  }
+  const sum = sameHourSamples.reduce((acc, item) => acc + item.loadKw, 0);
+  return sum / sameHourSamples.length;
+}
+
+function computeOutageMinutes(outageFlags: Array<{ timestamp: number; isOutage: boolean }>): number {
+  const cutoff = Date.now() - MAX_HISTORY_MS;
+  return outageFlags
+    .filter((flag) => flag.timestamp >= cutoff && flag.isOutage)
+    .length * (REFRESH_INTERVAL_SECONDS / 60);
+}
+
+function computeSpikeEvents(spikeEvents: number[]): number {
+  const cutoff = Date.now() - MAX_HISTORY_MS;
+  return spikeEvents.filter((timestamp) => timestamp >= cutoff).length;
+}
+
+function computeMismatch(mismatchRatios: Array<{ timestamp: number; ratio: number }>): number {
+  if (!mismatchRatios.length) return 0;
+  return mismatchRatios[mismatchRatios.length - 1].ratio;
+}
+
+function convertHouseholdStateToRealtime(state: HouseholdState): HouseholdRealtime {
+  return {
+    id: state.id,
+    transformerId: state.transformerId,
+    latitude: state.latitude,
+    longitude: state.longitude,
+    currentLoadKw: Number(state.latestLoadKw.toFixed(3)),
+    loadHistory: state.loadHistory
+      .slice(-96) // last 48 minutes (96 samples)
+      .map((entry) => ({ timestamp: new Date(entry.timestamp).toISOString(), loadKw: Number(entry.loadKw.toFixed(3)) })),
+  };
+}
+
+function aggregateSummary(
+  city: string,
+  metrics: TransformerRealtimeMetrics[],
+  alerts: Array<{ transformerId: string; transformerName: string; alert: OverloadAlert }>,
+  anomalies: Anomaly[]
+): DashboardSummary {
+  if (!metrics.length) {
+    return {
+      bghiScore: 100,
+      status: "Good",
+      color: "green",
+      totalTransformers: 0,
+      warningTransformers: 0,
+      criticalTransformers: 0,
+      anomalyCount24h: 0,
+      alertsCount: 0,
+      averageLoadPct: 0,
+    };
+  }
+
+  const avgBGHI = metrics.reduce((acc, metric) => acc + metric.bghi.bghiScore, 0) / metrics.length;
+  const avgLoadPct = metrics.reduce((acc, metric) => acc + metric.loadPercentage, 0) / metrics.length;
+
+  const warningTransformers = metrics.filter((metric) => metric.bghi.status === "Warning").length;
+  const criticalTransformers = metrics.filter((metric) => metric.bghi.status === "Critical").length;
+
+  return {
+    bghiScore: Number(avgBGHI.toFixed(2)),
+    status: avgBGHI >= 80 ? "Good" : avgBGHI >= 60 ? "Warning" : "Critical",
+    color: avgBGHI >= 80 ? "green" : avgBGHI >= 60 ? "amber" : "red",
+    totalTransformers: metrics.length,
+    warningTransformers,
+    criticalTransformers,
+    anomalyCount24h: anomalies.length,
+    alertsCount: alerts.length,
+    averageLoadPct: Number(avgLoadPct.toFixed(1)),
+  };
+}
+
+function updateTransformerState(
+  transformerState: TransformerState,
+  cityState: CityState,
+  weather: WeatherData,
+  timestamp: Date
+): { metrics: TransformerRealtimeMetrics; alerts: OverloadAlert | null } {
+  const households = transformerState.householdIds.map((id) => cityState.households.get(id)!);
+
+  let transformerLoadKw = 0;
+  households.forEach((household) => {
+    const reading = getSmartMeterReading(household.id, timestamp, REFRESH_INTERVAL_SECONDS);
+    household.latestLoadKw = reading.loadKw;
+    household.loadHistory.push({ timestamp: reading.timestamp.getTime(), loadKw: reading.loadKw });
+    household.loadHistory = pruneHistory(household.loadHistory);
+    transformerLoadKw += reading.loadKw;
+  });
+
+  const timestampMs = timestamp.getTime();
+  transformerState.history.push({ timestamp: timestampMs, loadKw: transformerLoadKw });
+  transformerState.history = pruneHistory(transformerState.history);
+
+  transformerState.rollingStats.add(transformerLoadKw, timestamp);
+
+  const rollingMean10Min = computeRollingMean(transformerState.history, 10);
+  const baselineHourlyMean = computeHourlyBaseline(transformerState.history);
+
+  const anomalies: Anomaly[] = [];
+  const { detectors } = transformerState;
+
+  const spikeAnomaly = detectors.spike.detect(transformerLoadKw, transformerState.rollingStats, transformerState.transformer.ID);
+  if (spikeAnomaly) {
+    transformerState.spikeEvents.push(timestampMs);
+    anomalies.push(spikeAnomaly);
+  }
+
+  const overdrawAnomaly = detectors.overdraw.detect(
+    rollingMean10Min,
+    baselineHourlyMean,
+    transformerState.transformer.ID
+  );
+  if (overdrawAnomaly) anomalies.push(overdrawAnomaly);
+
+  const outageAnomaly = detectors.outage.detect(transformerLoadKw, transformerState.transformer.ID);
+  if (outageAnomaly) anomalies.push(outageAnomaly);
+
+  const feederPowerKw = transformerLoadKw * (1 + (Math.random() - 0.5) * 0.1);
+  const mismatchAnomaly = detectors.mismatch.detect(feederPowerKw, transformerLoadKw, transformerState.transformer.ID);
+  const mismatchRatio = Math.abs(feederPowerKw - transformerLoadKw) / Math.max(0.5, feederPowerKw);
+  transformerState.mismatchRatios.push({ timestamp: timestampMs, ratio: mismatchRatio });
+  transformerState.mismatchRatios = pruneHistory(transformerState.mismatchRatios);
+  if (mismatchAnomaly) anomalies.push(mismatchAnomaly);
+
+  if (transformerLoadKw < 0.1) {
+    transformerState.outageFlags.push({ timestamp: timestampMs, isOutage: true });
+  } else {
+    transformerState.outageFlags.push({ timestamp: timestampMs, isOutage: false });
+  }
+  transformerState.outageFlags = pruneHistory(transformerState.outageFlags);
+
+  if (anomalies.length) {
+    transformerState.anomalies.push(...anomalies);
+    transformerState.anomalies = pruneOldAnomalies(transformerState.anomalies);
+  }
+
+  transformerState.spikeEvents = transformerState.spikeEvents.filter((eventTs) => eventTs >= Date.now() - MAX_HISTORY_MS);
+
+  const loadPercentage = (transformerLoadKw / transformerState.capacityKw) * 100;
+  const outageMinutes = computeOutageMinutes(transformerState.outageFlags);
+  const spikeEvents24h = computeSpikeEvents(transformerState.spikeEvents);
+  const mismatchScore = computeMismatch(transformerState.mismatchRatios);
+
+  const anomalyFrequencyScore = computeAnomalyFrequencyScore(transformerState.anomalies.length);
+  const bghiComponents = {
+    loadStress: computeLoadStress(loadPercentage),
+    outageScore: computeOutageScore(outageMinutes),
+    powerQuality: computePowerQualityScore({ spikeEventsLast24h: spikeEvents24h }),
+    anomalyFrequency: anomalyFrequencyScore,
+    environmentalStress: computeEnvironmentalStressScore(weather.temperature, weather.humidity),
+    mismatchScore: computeMismatchScore(mismatchRatio),
+  };
+
+  const bghi = calculateBGHI(bghiComponents);
+
+  const currentHour = timestamp.getHours();
+  const recentMeanKw = rollingMean10Min || transformerState.rollingStats.mean();
+  const forecastPoints = transformerState.forecaster.forecast24h(
+    currentHour,
+    recentMeanKw,
+    transformerState.capacityKw
+  );
+  const peakRisk = transformerState.forecaster.findPeakRisk(forecastPoints);
+  const overloadAlert = transformerState.forecaster.assessOverloadRisk(forecastPoints);
+
+  transformerState.lastUpdated = timestampMs;
+
+  const realtimeMetrics: TransformerRealtimeMetrics = {
+    transformer: {
+      ...transformerState.transformer,
+      totalLoad: transformerLoadKw,
+      households: transformerState.householdIds.map((id) => {
+        const state = cityState.households.get(id)!;
+        return {
+          id: state.id,
+          transformerId: state.transformerId,
+          latitude: state.latitude,
+          longitude: state.longitude,
+          load: state.latestLoadKw,
+        };
+      }),
+    },
+    currentLoadKw: Number(transformerLoadKw.toFixed(3)),
+    loadPercentage: Number(loadPercentage.toFixed(1)),
+    households: transformerState.householdIds.map((id) => convertHouseholdStateToRealtime(cityState.households.get(id)!)),
+    anomalies: [...transformerState.anomalies],
+    recentAnomalies: [...transformerState.anomalies.slice(-5)],
+    bghi,
+    forecast: {
+      points: forecastPoints,
+      peakRisk,
+      overloadAlert,
+    },
+    rollingStats: {
+      mean: Number(transformerState.rollingStats.mean().toFixed(2)),
+      std: Number(transformerState.rollingStats.std().toFixed(2)),
+    },
+    outageMinutes24h: Number(outageMinutes.toFixed(1)),
+    spikeEvents24h,
+    mismatchRatio: Number(mismatchRatio.toFixed(3)),
+    lastUpdated: new Date(transformerState.lastUpdated).toISOString(),
+  };
+
+  return { metrics: realtimeMetrics, alerts: overloadAlert ?? null };
+}
+
+export function getDashboardData(city: string): DashboardDataResponse {
+  const cityState = initializeCityState(city);
+  const timestamp = new Date();
+  const weather = generateMockWeather(city);
+
+  const transformerMetrics: TransformerRealtimeMetrics[] = [];
+  const alerts: Array<{ transformerId: string; transformerName: string; alert: OverloadAlert }> = [];
+  const anomalies: Anomaly[] = [];
+
+  cityState.transformers.forEach((transformerState) => {
+    const { metrics, alerts: overloadAlert } = updateTransformerState(transformerState, cityState, weather, timestamp);
+    transformerMetrics.push(metrics);
+    anomalies.push(...metrics.anomalies);
+    if (overloadAlert) {
+      alerts.push({
+        transformerId: transformerState.transformer.ID,
+        transformerName: transformerState.transformer.ID,
+        alert: overloadAlert,
+      });
+    }
+  });
+
+  const summary = aggregateSummary(city, transformerMetrics, alerts, anomalies);
+
+  cityState.lastUpdated = timestamp.getTime();
+
+  return {
+    city,
+    transformers: transformerMetrics,
+    summary,
+    alerts,
+    anomalies,
+    weather,
+    refreshIntervalSeconds: REFRESH_INTERVAL_SECONDS,
+    updatedAt: timestamp.toISOString(),
+  };
+}

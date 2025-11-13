@@ -1,9 +1,15 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { TransformerRealtimeMetrics } from "@/types/dashboard";
 
-// Dynamic import to avoid SSR issues with Leaflet
-export const CSVMapView = dynamic(
+interface CSVMapViewProps {
+  transformers: TransformerRealtimeMetrics[];
+  selectedTransformerId?: string | null;
+  onTransformerSelect?: (transformerId: string) => void;
+}
+
+export const CSVMapView = dynamic<CSVMapViewProps>(
   () => import("./csv-map-view-client").then((mod) => mod.CSVMapViewComponent),
   {
     ssr: false,
