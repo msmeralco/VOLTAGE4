@@ -2,22 +2,27 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Zap, BarChart3, MapPin, Shield } from "lucide-react";
+import { BarChart3, MapPin, Shield } from "lucide-react";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-white text-orange-600">
+    <div className="min-h-screen bg-white">
       {/* Navbar */}
       <nav className="bg-white backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Zap className="h-8 w-8 text-[#fe5014]" />
-            <span className="text-2xl font-bold text-[#fe5014]">
+            <img
+              src="/icons/meralcodark.svg"
+              alt="Meralco logo"
+              className="w-40 h-20 text-[#fe5014]"
+            />
+            {/* <Zap className="h-8 w-8 text-[#fe5014]" /> */}
+            {/* <span className="text-2xl font-bold text-[#fe5014]">
               GridPulse
-            </span>
+            </span> */}
           </div>
-          <div className="flex items-center space-x-4">
-            <Link
+          <div className="flex items-center space-x-4 pr-20">
+            {/* <Link
               href="/"
               className="text-[#fe5014] hover:text-orange-500 transition-colors"
             >
@@ -28,10 +33,10 @@ export default function LandingPage() {
               className="text-[#fe5014] hover:text-orange-500 transition-colors"
             >
               About
-            </Link>
+            </Link> */}
             <Link href="/login">
               <Button
-                className="bg-[#fe5014] hover:bg-orange-600 text-white border-none"
+                className="bg-white hover:bg-[#fe5014] text-[#fe5014] border-[3px] hover:text-white border-[#fe5014] hover: rounded-full px-10 py-4 text-lg"
               >
                 Login
               </Button>
@@ -43,9 +48,16 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="bg-[#fe5014] container mx-auto px-4 pt-10 pb-5 text-center rounded-t-[100px]">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-6xl font-bold text-white mb-6">
+          {/* <h1 className="text-6xl font-bold text-white mb-6">
             GridPulse
-          </h1>
+          </h1> */}
+          <div className="flex items-center justify-center">
+            <img
+              src="/icons/gridpulselight.svg"
+              alt="Gridpulse Logo"
+              className="w-full max-w-[600px] h-auto object-contain py-10"
+            />
+          </div>
           <p className="text-2xl text-white mb-4 font-semibold">
             Powering Smarter Energy Insights
           </p>
