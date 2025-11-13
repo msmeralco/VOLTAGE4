@@ -4,7 +4,7 @@ import type { BGHIResult } from "@/lib/bghi";
 import type { ForecastPoint, OverloadAlert, PeakRiskInfo } from "@/lib/forecasting";
 import type { WeatherData } from "@/lib/mock-data";
 
-export type ArtificialDisasterKind = "heatwave" | "typhoon" | "earthquake" | "brownout" | "custom";
+export type ArtificialDisasterKind = "heatwave" | "typhoon" | "earthquake" | "brownout" | "cyberattack" | "custom";
 
 export interface ArtificialDisasterInfo {
   type: ArtificialDisasterKind;
