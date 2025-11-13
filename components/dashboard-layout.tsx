@@ -1,14 +1,9 @@
 "use client";
-
 import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { LogOut, Menu, X } from "lucide-react";
-import { useState } from "react";
-
-export function DashboardLayout({ title, children }: { title?: string; children: React.ReactNode; }) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-import { Moon, Sun, LogOut, Zap, Bell, AlertTriangle } from "lucide-react";
+import { Moon, Sun, LogOut, Bell, AlertTriangle } from "lucide-react";
 import { useTheme } from "next-themes";
 import {
   DropdownMenu,
@@ -51,16 +46,10 @@ export function DashboardLayout({ children, title, warnings = [] }: DashboardLay
           </div>
 
           <div className="hidden md:flex items-center space-x-4">
-            <Button
-              onClick={handleLogout}
-              variant="ghost"
-              className="text-white hover:bg-[#fe5014]/60"
-            >
-          <div className="flex items-center space-x-2">
             {/* Notifications Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
+                <Button variant="ghost" size="icon" className="relative text-white">
                   <Bell className="h-5 w-5" />
                   {recentWarnings.length > 0 && (
                     <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
@@ -75,7 +64,8 @@ export function DashboardLayout({ children, title, warnings = [] }: DashboardLay
                     Recent Warnings
                   </h3>
                   <p className="text-xs text-gray-500">
-                    {recentWarnings.length} active warning{recentWarnings.length !== 1 ? "s" : ""}
+                    {recentWarnings.length} active warning
+                    {recentWarnings.length !== 1 ? "s" : ""}
                   </p>
                 </div>
                 <DropdownMenuSeparator />
@@ -131,59 +121,24 @@ export function DashboardLayout({ children, title, warnings = [] }: DashboardLay
             {/* Theme Toggle */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  {theme === "dark" ? (
-                    <Sun className="h-5 w-5" />
-                  ) : (
-                    <Moon className="h-5 w-5" />
-                  )}
+                <Button variant="ghost" size="icon" className="text-white">
+                  {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setTheme("light")}>
-                  Light
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("dark")}>
-                  Dark
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("system")}>
-                  System
-                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("light")}>Light</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("dark")}>Dark</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("system")}>System</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Logout */}
             <Button variant="outline" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
               Logout
             </Button>
           </div>
-
-          {/* Mobile menu button */}
-          <div className="md:hidden">
-            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-              {mobileMenuOpen ? (
-                <X className="h-6 w-6 text-[#fe5014]" />
-              ) : (
-                <Menu className="h-6 w-6 text-[#fe5014]" />
-              )}
-            </button>
-          </div>
         </div>
-
-        {/* Mobile menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200">
-            <div className="container mx-auto px-4 py-3">
-              <Button
-                onClick={handleLogout}
-                variant="ghost"
-                className="w-full text-[#fe5014] hover:bg-[#fe5014]/10"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        )}
       </header>
 
       {/* Main content */}
@@ -193,9 +148,7 @@ export function DashboardLayout({ children, title, warnings = [] }: DashboardLay
             <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
           </div>
         )}
-        <div className="container mx-auto px-4 pb-8">
-          {children}
-        </div>
+        <div className="container mx-auto px-4 pb-8">{children}</div>
       </main>
 
       {/* Footer */}
@@ -207,4 +160,3 @@ export function DashboardLayout({ children, title, warnings = [] }: DashboardLay
     </div>
   );
 }
-

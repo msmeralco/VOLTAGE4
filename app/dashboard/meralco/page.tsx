@@ -251,13 +251,6 @@ export default function MeralcoDashboard() {
   const renderTransformerStatusTable = () => {
     if (!dashboardData || !dashboardData.transformers.length) return null;
 
-  return (
-    <DashboardLayout title="">
-      <div
-        className="space-y-6 min-h-screen"
-        style={{ backgroundColor: "#fe5014", color: "#ffffff" }}
-      >
-        {/* City Selector */}
     return (
       <Card>
         <CardHeader>
@@ -438,9 +431,6 @@ export default function MeralcoDashboard() {
             <CardDescription>Real-time recommendations</CardDescription>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="h-[600px] flex items-center justify-center">
-                <p className="text-white">Loading map data...</p>
             {dashboardData.alerts.length ? (
               <div className="space-y-3">
                 {dashboardData.alerts.map((alertItem) => (
@@ -471,58 +461,6 @@ export default function MeralcoDashboard() {
     );
   };
 
-        {/* Transformer Details and Analytics */}
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Selected Transformer Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Transformer Details</CardTitle>
-              <CardDescription>
-                {selectedTransformer
-                  ? `Information for ${selectedTransformer.name}`
-                  : "Select a transformer on the map to view details"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {currentTransformer ? (
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-white/90">Transformer ID</p>
-                    <p className="text-xl font-bold">
-                      {isCSVMode 
-                        ? (currentTransformer as TransformerWithLoad).ID
-                        : (currentTransformer as Transformer).name}
-                    </p>
-                    <p className="text-sm text-white/90 mt-2">Type</p>
-                    <p className="text-lg font-semibold">
-                      {isCSVMode 
-                        ? (currentTransformer as TransformerWithLoad).EntityType
-                        : "Transformer"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-sm text-white/90">Total Load</p>
-                    <p className="text-2xl font-bold">
-                      {isCSVMode
-                        ? (currentTransformer as TransformerWithLoad).totalLoad.toFixed(2)
-                        : (currentTransformer as Transformer).currentLoad.toFixed(1)} kW
-                    </p>
-                    {!isCSVMode && (
-                      <>
-                        <p className="text-sm text-white/90">
-                          Capacity: {(currentTransformer as Transformer).capacity} kW
-                        </p>
-                        <div className="mt-2 w-full bg-white/20 rounded-full h-2.5">
-                          <div
-                            className="bg-white h-2.5 rounded-full"
-                            style={{
-                              width: `${((currentTransformer as Transformer).currentLoad / (currentTransformer as Transformer).capacity) * 100}%`,
-                            }}
-                          />
-                        </div>
-                      </>
-                    )}
   const renderLegacyLayout = () => (
     <>
       <Card>
@@ -581,105 +519,6 @@ export default function MeralcoDashboard() {
                   </div>
                 </div>
 
-                  {isCSVMode && (
-                    <div>
-                      <p className="text-sm text-white/90">Downstream Buildings</p>
-                      <p className="text-xl font-bold">
-                        {(currentTransformer as TransformerWithLoad).NumDownstreamBuildings}
-                      </p>
-                      {(currentTransformer as TransformerWithLoad).ParentID && (
-                        <p className="text-sm text-white/90 mt-2">
-                          Parent: {(currentTransformer as TransformerWithLoad).ParentID}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {weather && (
-                    <div className="space-y-2">
-                      <p className="text-sm font-semibold">Weather Parameters</p>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <Cloud className="h-4 w-4 inline mr-1 text-white" />
-                          <span className="text-white/90">Temperature: </span>
-                          <span className="font-semibold">{weather.temperature.toFixed(1)}°C</span>
-                        </div>
-                        <div>
-                          <span className="text-white/90">Humidity: </span>
-                          <span className="font-semibold">{weather.humidity.toFixed(1)}%</span>
-                        </div>
-                        <div>
-                          <span className="text-white/90">Pressure: </span>
-                          <span className="font-semibold">{weather.pressure.toFixed(1)} hPa</span>
-                        </div>
-                        <div>
-                          <span className="text-white/90">Wind: </span>
-                          <span className="font-semibold">{weather.windSpeed.toFixed(1)} m/s</span>
-                        </div>
-                        <div className="col-span-2">
-                          <span className="text-white/90">Condition: </span>
-                          <span className="font-semibold">{weather.condition}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {gridHealth !== null && (
-                    <div>
-                      <p className="text-sm text-white/90">Grid Health</p>
-                      <p className="text-2xl font-bold">
-                        {gridHealth.toFixed(1)}%
-                      </p>
-                      <div className="mt-2 w-full bg-white/20 rounded-full h-2.5">
-                        <div
-                          className={`h-2.5 rounded-full ${
-                            gridHealth > 70
-                              ? "bg-green-500"
-                              : gridHealth > 40
-                              ? "bg-yellow-500"
-                              : "bg-red-500"
-                          }`}
-                          style={{ width: `${gridHealth}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-white/90 text-center py-8">
-                  Click on a transformer marker to view details
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Predictive Insights */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Predictive Insights</CardTitle>
-              <CardDescription>AI-powered predictions and recommendations</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {insights.length > 0 ? (
-                <div className="space-y-3">
-                  {insights.map((insight, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start space-x-3 p-3 bg-white/10 rounded-lg border border-white/10"
-                    >
-                      <AlertTriangle className="h-5 w-5 text-white mt-0.5" />
-                      <p className="text-sm">{insight}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-white/90 text-center py-8">
-                  Select a transformer to see predictive insights
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
                 {legacyData.weather && (
                   <div className="space-y-2">
                     <p className="text-sm font-semibold">Weather Parameters</p>
@@ -742,48 +581,6 @@ export default function MeralcoDashboard() {
             <CardDescription>AI-powered predictions and recommendations</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="load" className="w-full">
-              <TabsList>
-                <TabsTrigger value="load">Transformer Load</TabsTrigger>
-                <TabsTrigger value="trends">24-Hour Trends</TabsTrigger>
-              </TabsList>
-              <TabsContent value="load" className="mt-4">
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={loadData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="load" fill="#ffffff" name="Total Load (kW)" />
-                    {!isCSVMode && (
-                      <Bar dataKey="capacity" fill="#fde3d2" name="Capacity (kW)" />
-                    )}
-                    {isCSVMode && (
-                      <Bar dataKey="buildings" fill="#93c5fd" name="Buildings" />
-                    )}
-                  </BarChart>
-                </ResponsiveContainer>
-              </TabsContent>
-              <TabsContent value="trends" className="mt-4">
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={timeSeriesData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="hour" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="load"
-                      stroke="#ffffff"
-                      strokeWidth={2}
-                      name="Load (kW)"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </TabsContent>
-            </Tabs>
             {legacyInsights.length > 0 ? (
               <div className="space-y-3">
                 {legacyInsights.map((insight, index) => (
@@ -976,4 +773,3 @@ export default function MeralcoDashboard() {
     </DashboardLayout>
   );
 }
-
